@@ -86,4 +86,13 @@ Kiến trúc dự kiến là Vercel cho ứng dụng và Supabase cho Postgres v
 2. Chạy `npx prisma migrate deploy` với `DIRECT_URL` của Supabase, rồi `npm run db:seed`.
 3. Trên Vercel, khai báo các biến trong `.env.example`, đặt `STORAGE_DRIVER=supabase`, `BETTER_AUTH_URL` là địa chỉ thật, và chọn region gần Supabase.
 
+### Cài ứng dụng trên điện thoại (PWA)
+
+PWA chỉ hoạt động trên HTTPS, vì vậy hãy deploy lên Vercel trước. Sau đó đăng nhập, mở **Thông tin shop** và dùng thẻ **Cài Bích Ngọc Florist**:
+
+- Android/Chrome: bấm **Cài ứng dụng** hoặc chọn **Cài đặt ứng dụng** trong menu trình duyệt.
+- iPhone/iPad: mở bằng Safari, bấm **Chia sẻ** rồi chọn **Thêm vào Màn hình chính**.
+
+Ứng dụng mở thẳng vào `/admin`. Dữ liệu quản trị không được lưu offline; khi mất mạng ứng dụng hiển thị trang yêu cầu kết nối lại để tránh dùng dữ liệu cũ.
+
 Lưu ý: gói Hobby của Vercel chỉ dành cho mục đích phi thương mại. Khi tiệm dùng thật cần gói trả phí, hoặc một nơi host Node.js khác.
