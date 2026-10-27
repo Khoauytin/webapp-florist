@@ -181,6 +181,12 @@ describe("calendar, overview and to-do summary", () => {
 
   it("sums only NEW orders in the range, with quantity per product", async () => {
     const { red, box } = await setup();
+    await prisma.productImage.createMany({
+      data: [
+        { productId: red.id, storagePath: "products/red/1.webp", url: "https://img.test/red-1.webp", sortOrder: 0, isPrimary: false },
+        { productId: red.id, storagePath: "products/red/2.webp", url: "https://img.test/red-2.webp", sortOrder: 1, isPrimary: true },
+      ],
+    });
     const a = await createOrder(orderInput([{ productId: red.id, qty: 20 }, { productId: box.id, qty: 1 }], { deliveryDate: "2026-10-27", deposit: 3000000 }));
     await createOrder(orderInput([{ productId: red.id, qty: 6 }], { deliveryDate: "2026-10-28", deposit: 1000000 }));
     const delivering = await createOrder(orderInput([{ productId: red.id, qty: 5 }], { deliveryDate: "2026-10-27" }));
@@ -194,6 +200,7 @@ describe("calendar, overview and to-do summary", () => {
     expect(month).toMatchObject({ count: 2, total: 20 * 380000 + 650000 + 6 * 380000, deposit: 4000000 });
     expect(month.remaining).toBe(month.total - 4000000);
     expect(month.products.map((p) => [p.code, p.qty])).toEqual([["BO-005", 26], ["BO-006", 1]]);
+    expect(month.products.map((p) => p.imageUrl)).toEqual(["https://img.test/red-2.webp", null]);
 
     const day = await todoSummary("2026-10-27", "2026-10-27");
     expect(day.count).toBe(1);

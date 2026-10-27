@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { overview, ordersInRange, statusCounts } from "@/server/services/orders.service";
+import { overview, ordersInRange, statusCounts, weekBounds } from "@/server/services/orders.service";
 import { getShopSettings } from "@/server/services/settings.service";
 import { Icon } from "@/components/admin/icon";
 import { OrderCard } from "@/components/admin/orders";
@@ -24,13 +24,14 @@ export default async function OverviewPage({ searchParams }: { searchParams: SP 
   await requireUser();
   const sp = await searchParams;
   const today = todayVn();
-  const ov = await overview(today);
   const range = sp.range === "month" || sp.range === "all" ? sp.range : "week";
   const status = (typeof sp.status === "string" && (ORDER_STATUSES as string[]).includes(sp.status) ? sp.status : "NEW") as OrderStatusKey;
-  const [from, to] = range === "week" ? [ov.weekFrom, ov.weekTo] : range === "month" ? [startOfMonth(today), endOfMonth(today)] : ["2000-01-01", "2100-12-31"];
+  const week = weekBounds(today);
+  const [from, to] = range === "week" ? [week.weekFrom, week.weekTo] : range === "month" ? [startOfMonth(today), endOfMonth(today)] : ["2000-01-01", "2100-12-31"];
   // New orders past their date are still to do, so the New list also includes the overdue ones.
   const OPEN_START = "2000-01-01";
-  const [list, counts, upToNow, settings] = await Promise.all([
+  const [ov, list, counts, upToNow, settings] = await Promise.all([
+    overview(today),
     ordersInRange(status === "NEW" ? OPEN_START : from, to, status),
     statusCounts(from, to),
     statusCounts(OPEN_START, to),

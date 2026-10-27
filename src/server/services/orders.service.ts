@@ -314,35 +314,50 @@ export async function calendarMarks(from: Ymd, to: Ymd) {
 export async function todoSummary(from: Ymd, to: Ymd) {
   const orders = await prisma.order.findMany({
     where: { status: "NEW", deliveryDate: { gte: ymdToDbDate(from), lte: ymdToDbDate(to) } },
-    select: { total: true, deposit: true, items: { select: { productId: true, nameSnapshot: true, productCodeSnapshot: true, qty: true } } },
+    select: {
+      total: true,
+      deposit: true,
+      items: {
+        select: {
+          productId: true,
+          nameSnapshot: true,
+          productCodeSnapshot: true,
+          qty: true,
+          product: { select: { images: { where: { isPrimary: true }, select: { url: true }, take: 1 } } },
+        },
+      },
+    },
   });
   const total = orders.reduce((s, o) => s + o.total, 0);
   const deposit = orders.reduce((s, o) => s + o.deposit, 0);
-  const per = new Map<string, { productId: string; code: string; name: string; qty: number }>();
+  const per = new Map<string, { productId: string; code: string; name: string; qty: number; imageUrl: string | null }>();
   for (const o of orders) {
     for (const i of o.items) {
-      const row = per.get(i.productId) ?? { productId: i.productId, code: i.productCodeSnapshot, name: i.nameSnapshot, qty: 0 };
+      const row = per.get(i.productId) ?? {
+        productId: i.productId,
+        code: i.productCodeSnapshot,
+        name: i.nameSnapshot,
+        qty: 0,
+        imageUrl: i.product.images[0]?.url ?? null,
+      };
       row.qty += i.qty;
       per.set(i.productId, row);
     }
   }
   const products = [...per.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, "vi"));
-  const images = await prisma.productImage.findMany({ where: { productId: { in: products.map((p) => p.productId) }, isPrimary: true }, select: { productId: true, url: true } });
-  const imageOf = new Map(images.map((i) => [i.productId, i.url]));
-  return {
-    count: orders.length,
-    total,
-    deposit,
-    remaining: total - deposit,
-    products: products.map((p) => ({ ...p, imageUrl: imageOf.get(p.productId) ?? null })),
-  };
+  return { count: orders.length, total, deposit, remaining: total - deposit, products };
 }
 
 /** The four overview cards (spec 4, "Thẻ tổng quan"). */
-export async function overview(today: Ymd = todayVn()) {
+/** Monday to Sunday around `today`. Pure date math, so callers can use it before any query runs. */
+export function weekBounds(today: Ymd): { weekFrom: Ymd; weekTo: Ymd } {
   const dow = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7;
   const weekFrom = addDays(today, -dow);
-  const weekTo = addDays(weekFrom, 6);
+  return { weekFrom, weekTo: addDays(weekFrom, 6) };
+}
+
+export async function overview(today: Ymd = todayVn()) {
+  const { weekFrom, weekTo } = weekBounds(today);
   const [todayCount, weekCount, newOrders] = await Promise.all([
     prisma.order.count({ where: { deliveryDate: ymdToDbDate(today), status: { not: "CANCELLED" } } }),
     prisma.order.count({ where: { deliveryDate: { gte: ymdToDbDate(weekFrom), lte: ymdToDbDate(weekTo) }, status: { not: "CANCELLED" } } }),

@@ -21,6 +21,9 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
+    // Admin pages call getSession on every navigation; the signed cookie answers it without a
+    // database round trip. A sign-out from another device can take up to maxAge to show here.
+    cookieCache: { enabled: true, maxAge: 60 * 5 },
   },
   rateLimit: {
     enabled: process.env.NODE_ENV === "production",
