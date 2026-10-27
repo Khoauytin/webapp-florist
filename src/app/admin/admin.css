@@ -438,3 +438,20 @@ a.chip { display: inline-flex; align-items: center; }
 .seg .segbtn[aria-pressed="true"], .seg .segbtn[aria-current="page"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px oklch(0.4 0.08 292 / 0.12); }
 a.day { color: inherit; }
 .menu-link:hover { background: var(--sunken); }
+
+/* Installable PWA card */
+.pwa-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s4); padding: var(--s5); overflow: hidden; border-radius: 22px; background: linear-gradient(135deg, var(--sky), var(--surface) 58%, var(--lav)); box-shadow: var(--shadow); }
+.pwa-card::after { content: ""; position: absolute; right: -54px; bottom: -76px; width: 180px; height: 180px; border: 24px solid var(--accent); border-radius: 50%; opacity: 0.08; pointer-events: none; }
+.pwa-card > * { position: relative; z-index: 1; }
+.pwa-card-icon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-float); }
+.pwa-card-copy { display: grid; gap: 3px; min-width: 0; }
+.pwa-card-copy p { max-width: 470px; color: var(--muted); font-size: 0.875rem; }
+.pwa-eyebrow { color: var(--accent); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.pwa-install-button { min-width: 156px; }
+.pwa-state { display: inline-flex; align-items: center; min-height: 34px; padding: 0 var(--s3); border-radius: var(--r-pill); background: var(--surface); color: var(--muted); font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.pwa-state-installed { background: var(--mint); color: var(--mint-ink); }
+@media (max-width: 680px) {
+  .pwa-card { grid-template-columns: auto minmax(0, 1fr); padding: var(--s4); }
+  .pwa-install-button, .pwa-state { grid-column: 1 / -1; width: 100%; }
+  .pwa-state { justify-content: center; }
+}

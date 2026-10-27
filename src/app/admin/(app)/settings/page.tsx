@@ -6,6 +6,7 @@ import { formatPhone } from "@/server/domain/phone";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { Icon } from "@/components/admin/icon";
 import { SettingsForm } from "@/components/admin/settings-forms";
+import { InstallAppCard } from "@/components/pwa/install-app-card";
 import { requireUser } from "@/server/auth/session";
 
 export const metadata = { title: "Thông tin shop" };
@@ -46,6 +47,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: SP 
           </small>
         </div>
       </section>
+      <InstallAppCard />
       <section className="section" aria-labelledby="top-products-heading">
         <div className="shead shop-products-head">
           <div className="shop-products-title">
