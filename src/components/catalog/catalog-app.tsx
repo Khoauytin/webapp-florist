@@ -468,6 +468,17 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
     setShown(product);
     setSlide(0);
   }
+  // Every opening starts at the first photo: the gallery is remounted, so a photo swiped to
+  // earlier (same product or another one) does not carry over.
+  const [openCount, setOpenCount] = useState(product ? 1 : 0);
+  const [wasOpen, setWasOpen] = useState(!!product);
+  if (!!product !== wasOpen) {
+    setWasOpen(!!product);
+    if (product) {
+      setOpenCount(openCount + 1);
+      setSlide(0);
+    }
+  }
 
   // Layout effect: when the photo flies in (View Transition), the dialog must be open in the same frame.
   useLayoutEffect(() => {
@@ -563,6 +574,7 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
             <div className="sheet-view">
               <div>
                 <div
+                  key={openCount}
                   className="gallery"
                   ref={gallery}
                   tabIndex={0}
