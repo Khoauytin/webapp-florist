@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 export interface CatalogCategory {
   id: string;
@@ -33,6 +34,34 @@ const money = (n: number) => n.toLocaleString("vi-VN") + "đ";
 const priceText = (p: CatalogProduct) => (p.price ? money(p.price) : "Liên hệ báo giá");
 const slugOf = (p: CatalogProduct) => p.code.toLowerCase();
 const orderMessage = (p: CatalogProduct) => `Mình muốn đặt mẫu ${p.code} · ${p.name}${p.price ? ` (${money(p.price)})` : ""}`;
+
+const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** The photo can fly from the card into the sheet only where View Transitions exist. */
+const canFly = () => motionOK() && typeof document.startViewTransition === "function";
+const vtName = (el: HTMLElement, name: string) => (name ? el.style.setProperty("view-transition-name", name) : el.style.removeProperty("view-transition-name"));
+const sheetEl = () => document.querySelector<HTMLDialogElement>("dialog.sheet");
+
+/** Card photo: shimmers while loading and fades in from a blur. Photos already loaded show at once. */
+function CardPhoto({ src }: { src?: string }) {
+  const done = (e: React.SyntheticEvent<HTMLImageElement>) => delete e.currentTarget.parentElement?.dataset.state;
+  return (
+    <span className="card-photo">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          ref={(img) => {
+            if (img && !(img.complete && img.naturalWidth) && motionOK() && img.parentElement) img.parentElement.dataset.state = "loading";
+          }}
+          onLoad={done}
+          onError={done}
+        />
+      ) : null}
+    </span>
+  );
+}
 
 const CONTACT_LOGOS = {
   phone: "/contact-icons/phone.png",
@@ -117,17 +146,152 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
     return () => window.removeEventListener("popstate", sync);
   }, [bySlug]);
 
-  const openProduct = (p: CatalogProduct) => {
-    history.pushState({ sheet: slugOf(p) }, "", "#" + slugOf(p));
-    setPicking(false);
-    setOpen(p);
+  // ----- Motion: sliding tab pill, sticky-bar shadow, contact bar that steps aside while scrolling down -----
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const inkRef = useRef<HTMLSpanElement>(null);
+  const tabsWrapRef = useRef<HTMLDivElement>(null);
+  const introRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLElement>(null);
+  const inkPlaced = useRef(false);
+  const sourcePhoto = useRef<HTMLElement | null>(null);
+
+  const placeInk = useCallback((animate: boolean) => {
+    const tabs = tabsRef.current;
+    const ink = inkRef.current;
+    const t = tabs?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!tabs || !ink || !t) return;
+    ink.style.transition = animate && motionOK() ? "" : "none";
+    ink.style.setProperty("--x", t.offsetLeft + "px");
+    ink.style.setProperty("--y", t.offsetTop + "px");
+    ink.style.setProperty("--w", t.offsetWidth + "px");
+    ink.style.setProperty("--h", t.offsetHeight + "px");
+    ink.style.setProperty("--ink-c", t.style.getPropertyValue("--c"));
+    tabs.classList.add("has-ink");
+  }, []);
+
+  useLayoutEffect(() => {
+    placeInk(inkPlaced.current);
+    if (inkPlaced.current) {
+      tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: motionOK() ? "smooth" : "auto" });
+    }
+    inkPlaced.current = true;
+  }, [active, placeInk]);
+
+  useEffect(() => {
+    const again = () => placeInk(false);
+    window.addEventListener("resize", again);
+    document.fonts?.ready.then(again);
+    return () => window.removeEventListener("resize", again);
+  }, [placeInk]);
+
+  useEffect(() => {
+    const intro = introRef.current;
+    const wrap = tabsWrapRef.current;
+    if (!intro || !wrap) return;
+    const io = new IntersectionObserver(([e]) => wrap.classList.toggle("stuck", !e.isIntersecting && e.boundingClientRect.top < 0));
+    io.observe(intro);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    let lastY = window.scrollY;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const dy = y - lastY;
+        const atEnd = y + window.innerHeight >= document.documentElement.scrollHeight - 40;
+        if (Math.abs(dy) > 6 || atEnd) {
+          bar.classList.toggle("away", dy > 0 && y > 240 && !atEnd && motionOK());
+          lastY = y;
+        }
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const openProduct = (p: CatalogProduct, photo?: HTMLElement | null) => {
+    const go = () => {
+      history.pushState({ sheet: slugOf(p) }, "", "#" + slugOf(p));
+      setPicking(false);
+      setOpen(p);
+    };
+    sourcePhoto.current = photo ?? null;
+    if (!photo || !canFly()) return go();
+    // Old state: the card photo carries the name. New state: the sheet's first photo carries it.
+    vtName(photo, "vt-photo");
+    const t = document.startViewTransition(() => {
+      vtName(photo, "");
+      flushSync(go);
+      const d = sheetEl();
+      if (!d) return;
+      // "arriving" holds the other photos back until the flying one has landed.
+      d.classList.add("vt", "is-open", "arriving");
+      vtName(d, "vt-sheet");
+      const first = d.querySelector<HTMLElement>(".slide");
+      if (first) vtName(first, "vt-photo");
+    });
+    // If the browser skips the flight (another tap, a hidden tab), the DOM update still runs:
+    // fall back to the plain slide-up so the sheet never just pops in.
+    t.ready.catch(() =>
+      t.updateCallbackDone
+        .then(() => {
+          const d = sheetEl();
+          if (!d?.open) return;
+          d.classList.remove("vt", "is-open");
+          d.getBoundingClientRect();
+          d.classList.add("is-open");
+        })
+        .catch(() => {}),
+    );
+    t.finished.catch(() => {}).finally(() => {
+      const d = sheetEl();
+      if (!d) return;
+      vtName(d, "");
+      d.querySelectorAll<HTMLElement>(".slide").forEach((s) => vtName(s, ""));
+      d.classList.remove("vt");
+      requestAnimationFrame(() => d.classList.remove("arriving"));
+    });
   };
-  const closeSheet = () => {
+  const leaveSheet = () => {
     if (history.state?.sheet) history.back();
     else {
       history.replaceState(null, "", location.pathname + location.search);
       setOpen(null);
     }
+  };
+  const closeSheet = () => {
+    const d = sheetEl();
+    const photo = sourcePhoto.current;
+    // The photo flies back to its card when the first photo is showing; a dragged-away sheet just slides off.
+    if (!d?.open || !photo?.isConnected || d.classList.contains("dismissing") || !canFly()) return leaveSheet();
+    const gallery = d.querySelector<HTMLElement>(".gallery");
+    const first = gallery && gallery.scrollLeft < 8 ? d.querySelector<HTMLElement>(".slide") : null;
+    if (first) vtName(first, "vt-photo");
+    vtName(d, "vt-sheet");
+    d.classList.add("vt");
+    const t = document.startViewTransition(() => {
+      if (first) {
+        vtName(first, "");
+        vtName(photo, "vt-photo");
+      }
+      vtName(d, "");
+      flushSync(() => setOpen(null));
+      d.close();
+    });
+    t.ready.catch(() => {});
+    t.finished.catch(() => {}).finally(() => {
+      vtName(photo, "");
+      d.classList.remove("vt");
+      if (history.state?.sheet) history.back();
+      else history.replaceState(null, "", location.pathname + location.search);
+    });
   };
 
   // The copy starts inside the tap itself and the chat opens through a real link, so phone
@@ -185,13 +349,14 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
       </header>
 
       <main>
-        <section className="intro" aria-label="Giới thiệu">
+        <section className="intro" aria-label="Giới thiệu" ref={introRef}>
           <p>{shop.name} là tiệm hoa handmade tại Hà Nội, chuyên hoa lụa và hoa sáp được kết thủ công bằng tay.</p>
           <p>Hoa giữ dáng, giữ màu lâu và không cần tưới nước, hợp để tặng hoặc trang trí. Bạn xem mẫu bên dưới, thích mẫu nào thì bấm Đặt mẫu này để nhắn shop.</p>
         </section>
 
-        <div className="tabs-wrap" id="mau-hoa">
-          <div className="tabs" role="tablist" aria-label="Dòng sản phẩm">
+        <div className="tabs-wrap" id="mau-hoa" ref={tabsWrapRef}>
+          <div className="tabs" role="tablist" aria-label="Dòng sản phẩm" ref={tabsRef}>
+            <span className="tab-ink" aria-hidden="true" ref={inkRef} />
             {[{ id: "all", name: "Tất cả", color: "#8DBDE3" }, ...categories].map((c) => (
               <button
                 key={c.id}
@@ -223,14 +388,17 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
           <p className="catalog-hint">
             {list.length ? `${list.length} mẫu · Chạm vào mẫu để xem thêm ảnh` : term ? "Không tìm thấy mẫu phù hợp. Thử từ khác hoặc nhắn shop nhé." : "Dòng này chưa có mẫu. Bạn nhắn shop để xem các mẫu mới nhất nhé."}
           </p>
-          <ul className="grid">
+          {/* Keyed by category so switching tabs replays the staggered entrance. */}
+          <ul className="grid" key={active}>
             {list.map((p, i) => (
               <li key={p.code} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
-                <button className="card" type="button" style={{ "--c": catById.get(p.categoryId)?.color } as React.CSSProperties} onClick={() => openProduct(p)}>
-                  <span className="card-photo">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {p.images[0] ? <img src={p.images[0]} alt="" loading="lazy" /> : null}
-                  </span>
+                <button
+                  className="card"
+                  type="button"
+                  style={{ "--c": catById.get(p.categoryId)?.color } as React.CSSProperties}
+                  onClick={(e) => openProduct(p, e.currentTarget.querySelector<HTMLElement>(".card-photo"))}
+                >
+                  <CardPhoto src={p.images[0]} />
                   <span className="card-name">{p.name}</span>
                   <span className="card-price">{priceText(p)}</span>
                 </button>
@@ -245,7 +413,7 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
         <p>Hoa lụa, hoa sáp handmade cao cấp · Hà Nội</p>
       </footer>
 
-      <nav className="contact-bar" aria-label="Liên hệ shop">
+      <nav className="contact-bar" aria-label="Liên hệ shop" ref={barRef}>
         <Contact shop={shop} onMissing={toast} kind="phone" label="Gọi" main />
         <Contact shop={shop} onMissing={toast} kind="zalo" label="Zalo" />
         <Contact shop={shop} onMissing={toast} kind="facebook" label="Facebook" />
@@ -282,6 +450,12 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
   );
 }
 
+function resetDrag(d: HTMLDialogElement) {
+  d.classList.remove("dragging", "drag-dim", "dismissing", "arriving", "vt");
+  d.style.removeProperty("--drag");
+  d.style.removeProperty("--p");
+}
+
 /** Bottom sheet (dialog) with gallery, specs and the action area. */
 function ProductSheet({ product, category, onClose, toast, children }: { product: CatalogProduct | null; category?: CatalogCategory; onClose: () => void; toast: React.ReactNode; children: React.ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -295,11 +469,13 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
     setSlide(0);
   }
 
-  useEffect(() => {
+  // Layout effect: when the photo flies in (View Transition), the dialog must be open in the same frame.
+  useLayoutEffect(() => {
     const d = ref.current!;
     clearTimeout(closeTimer.current);
     if (product) {
       if (!d.open) {
+        resetDrag(d);
         d.showModal();
         d.focus();
       }
@@ -308,9 +484,54 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
     } else if (d.open) {
       d.classList.remove("is-open");
       document.documentElement.classList.remove("sheet-open");
-      closeTimer.current = setTimeout(() => d.close(), 340);
+      closeTimer.current = setTimeout(() => {
+        d.close();
+        resetDrag(d);
+      }, 340);
     }
   }, [product]);
+
+  // Drag the handle down to close (phones); the backdrop lightens with the finger.
+  const drag = useRef<{ y0: number; y: number; t: number; v: number } | null>(null);
+  const onGrabDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest(".sheet-close") || matchMedia("(min-width: 900px)").matches) return;
+    drag.current = { y0: e.clientY, y: e.clientY, t: performance.now(), v: 0 };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // the pointer is already gone; the move/up handlers still work without capture
+    }
+    ref.current!.classList.add("dragging", "drag-dim");
+  };
+  const onGrabMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = drag.current;
+    if (!s) return;
+    const now = performance.now();
+    s.v = (e.clientY - s.y) / Math.max(1, now - s.t);
+    s.y = e.clientY;
+    s.t = now;
+    const d = ref.current!;
+    const dy = Math.max(0, e.clientY - s.y0);
+    d.style.setProperty("--drag", dy + "px");
+    d.style.setProperty("--p", String(Math.max(0, 1 - dy / (d.offsetHeight || 1))));
+  };
+  const onGrabEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = drag.current;
+    if (!s) return;
+    drag.current = null;
+    const d = ref.current!;
+    d.classList.remove("dragging");
+    const dy = Math.max(0, e.clientY - s.y0);
+    // Close after a long pull, or a quick flick that has moved a little (a tiny twitch does not count).
+    if (dy > d.offsetHeight * 0.3 || (s.v > 0.6 && dy > 48)) {
+      d.style.setProperty("--drag", d.offsetHeight + "px");
+      d.style.setProperty("--p", "0");
+      d.classList.add("dismissing");
+      onClose();
+    } else {
+      resetDrag(d);
+    }
+  };
 
   const p = product ?? shown;
   const specs = p ? ([["Kích thước", p.size], ["Màu sắc", p.color]] as const).filter((s) => s[1]) : [];
@@ -329,7 +550,7 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="sheet-grab">
+      <div className="sheet-grab" onPointerDown={onGrabDown} onPointerMove={onGrabMove} onPointerUp={onGrabEnd} onPointerCancel={onGrabEnd}>
         <button className="sheet-close" type="button" aria-label="Đóng" onClick={onClose}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -360,7 +581,7 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
                   }}
                 >
                   {(p.images.length ? p.images : [null]).map((src, i) => (
-                    <div className="slide" key={src ?? i}>
+                    <div className={i === slide ? "slide on" : "slide"} key={src ?? i}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {src ? <img src={src} alt={`${p.name}, ảnh ${i + 1}`} /> : null}
                     </div>
