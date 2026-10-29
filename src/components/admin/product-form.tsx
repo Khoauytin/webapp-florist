@@ -23,7 +23,11 @@ export interface ProductFormValues {
   color: string;
   description: string;
   isVisible: boolean;
+  variants: { id?: string; key: string; name: string; price: number | null }[];
 }
+
+let variantKeySeq = 0;
+const newVariantKey = () => `variant-${++variantKeySeq}`;
 
 export function ProductForm({
   productId,
@@ -57,7 +61,13 @@ export function ProductForm({
     start(async () => {
       setError(null);
       setFe({});
-      const r = await saveProductAction(productId, { ...v, size: v.size || undefined, color: v.color || undefined, description: v.description || undefined });
+      const r = await saveProductAction(productId, {
+        ...v,
+        size: v.size || undefined,
+        color: v.color || undefined,
+        description: v.description || undefined,
+        variants: v.variants.map(({ id, name, price }) => ({ id, name, price })),
+      });
       if (!r.ok) {
         setError(r.error ?? "Có lỗi xảy ra");
         setFe(r.fieldErrors ?? {});
@@ -83,6 +93,22 @@ export function ProductForm({
       toast(r.message ?? "Đã xóa sản phẩm");
       router.push("/admin/products");
       router.refresh();
+    });
+  const addVariant = () =>
+    setV((current) => ({
+      ...current,
+      variants: [...current.variants, { key: newVariantKey(), name: "", price: current.variants.length ? null : current.price }],
+    }));
+  const updateVariant = (key: string, patch: Partial<ProductFormValues["variants"][number]>) =>
+    setV((current) => ({ ...current, variants: current.variants.map((variant) => (variant.key === key ? { ...variant, ...patch } : variant)) }));
+  const removeVariant = (key: string) => setV((current) => ({ ...current, variants: current.variants.filter((variant) => variant.key !== key) }));
+  const moveVariant = (index: number, direction: -1 | 1) =>
+    setV((current) => {
+      const swap = index + direction;
+      if (swap < 0 || swap >= current.variants.length) return current;
+      const variants = [...current.variants];
+      [variants[index], variants[swap]] = [variants[swap], variants[index]];
+      return { ...current, variants };
     });
 
   return (
@@ -122,9 +148,72 @@ export function ProductForm({
           ))}
         </select>
       </Field>
-      <Field label="Giá (đ)" htmlFor="pp" error={fe.price} hint="Để trống thì trang khách hiện “Liên hệ báo giá”. Mẫu chưa có giá chưa thêm vào đơn được.">
-        <MoneyInput id="pp" value={v.price} onChange={(n) => set("price", n)} placeholder="Liên hệ báo giá" describedBy="pp-hint" />
-      </Field>
+      {v.variants.length ? null : (
+        <Field label="Giá (đ)" htmlFor="pp" error={fe.price} hint="Để trống thì trang khách hiện “Liên hệ báo giá”. Mẫu chưa có giá chưa thêm vào đơn được.">
+          <MoneyInput id="pp" value={v.price} onChange={(n) => set("price", n)} placeholder="Liên hệ báo giá" describedBy="pp-hint" />
+        </Field>
+      )}
+      <section className="variant-editor" aria-labelledby="variant-title">
+        <div className="variant-editor-head">
+          <div>
+            <h2 id="variant-title">Biến thể</h2>
+            <p className="hint">Dùng cho size hoặc lựa chọn như 1 gấu, 3 gấu. Mỗi card có giá riêng.</p>
+          </div>
+          {!v.variants.length ? (
+            <button className="btn btn-light btn-sm" type="button" onClick={addVariant}>
+              <Icon name="plus" className="icon-sm" />
+              Thêm biến thể
+            </button>
+          ) : null}
+        </div>
+        {fe.variants ? <p className="err">{fe.variants}</p> : null}
+        {v.variants.length ? (
+          <div className="variant-list">
+            {v.variants.map((variant, index) => (
+              <article className="variant-card" key={variant.key}>
+                <div className="variant-card-head">
+                  <div>
+                    <b>Biến thể {index + 1}</b>
+                    {index === 0 ? <span className="variant-default">Mặc định</span> : null}
+                  </div>
+                  <div className="variant-card-actions">
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => moveVariant(index, -1)} disabled={index === 0} aria-label={`Đưa biến thể ${index + 1} lên`}>
+                      <Icon name="up" className="icon-sm" />
+                    </button>
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => moveVariant(index, 1)} disabled={index === v.variants.length - 1} aria-label={`Đưa biến thể ${index + 1} xuống`}>
+                      <Icon name="down" className="icon-sm" />
+                    </button>
+                    <button className="btn btn-ghost btn-sm variant-remove" type="button" onClick={() => removeVariant(variant.key)} aria-label={`Xóa biến thể ${index + 1}`}>
+                      <Icon name="trash" className="icon-sm" />
+                    </button>
+                  </div>
+                </div>
+                <div className="row2">
+                  <Field label="Tên biến thể" htmlFor={`variant-name-${variant.key}`} required>
+                    <input
+                      className="input"
+                      id={`variant-name-${variant.key}`}
+                      value={variant.name}
+                      onChange={(event) => updateVariant(variant.key, { name: event.target.value })}
+                      maxLength={120}
+                      placeholder="Ví dụ: Size S hoặc 3 gấu"
+                    />
+                  </Field>
+                  <Field label="Giá (đ)" htmlFor={`variant-price-${variant.key}`} required>
+                    <MoneyInput id={`variant-price-${variant.key}`} value={variant.price} onChange={(price) => updateVariant(variant.key, { price })} placeholder="Nhập giá" />
+                  </Field>
+                </div>
+              </article>
+            ))}
+            <button className="btn btn-light btn-block" type="button" onClick={addVariant} disabled={v.variants.length >= 20}>
+              <Icon name="plus" />
+              {v.variants.length >= 20 ? "Đã đủ 20 biến thể" : "Thêm card biến thể"}
+            </button>
+          </div>
+        ) : (
+          <p className="muted small">Không bắt buộc. Nếu thêm biến thể, giá chính phía trên sẽ không được sử dụng.</p>
+        )}
+      </section>
       <div className="row2">
         <Field label="Kích thước" htmlFor="psz">
           <input className="input" id="psz" value={v.size} onChange={(e) => set("size", e.target.value)} maxLength={120} placeholder="40 x 55 cm" />

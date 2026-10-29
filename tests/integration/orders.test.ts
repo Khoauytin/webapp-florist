@@ -54,6 +54,52 @@ describe("creating and editing orders", () => {
     await expect(createOrder(orderInput([{ productId: unpriced.id, qty: 1 }]))).rejects.toThrow(/nhập đơn giá/i);
   });
 
+  it("selects the first variant by default and snapshots the selected variant name and price", async () => {
+    const { bo } = await setup();
+    const product = await makeProduct(bo.id, { name: "Bó gấu", price: null });
+    const variants = await Promise.all([
+      prisma.productVariant.create({ data: { productId: product.id, name: "1 gấu", price: 390000, sortOrder: 0 } }),
+      prisma.productVariant.create({ data: { productId: product.id, name: "3 gấu", price: 490000, sortOrder: 1 } }),
+    ]);
+
+    const firstOrder = await createOrder(orderInput([{ productId: product.id, qty: 1 }]));
+    expect((await getOrder(firstOrder.id))?.items[0]).toMatchObject({
+      productVariantId: variants[0].id,
+      variantNameSnapshot: "1 gấu",
+      unitPriceSnapshot: 390000,
+    });
+
+    const selectedOrder = await createOrder(orderInput([{ productId: product.id, productVariantId: variants[1].id, unitPrice: 1, qty: 2 }]));
+    expect((await getOrder(selectedOrder.id))?.items[0]).toMatchObject({
+      productVariantId: variants[1].id,
+      variantNameSnapshot: "3 gấu",
+      unitPriceSnapshot: 490000,
+      qty: 2,
+    });
+  });
+
+  it("rejects a variant from another product and keeps old snapshots after a variant is edited or deleted", async () => {
+    const { bo } = await setup();
+    const first = await makeProduct(bo.id, { name: "Bó gấu", price: null });
+    const second = await makeProduct(bo.id, { name: "Bó khác", price: null });
+    const chosen = await prisma.productVariant.create({ data: { productId: first.id, name: "3 gấu", price: 490000, sortOrder: 0 } });
+    const wrong = await prisma.productVariant.create({ data: { productId: second.id, name: "Size L", price: 700000, sortOrder: 0 } });
+
+    await expect(createOrder(orderInput([{ productId: first.id, productVariantId: wrong.id, qty: 1 }]))).rejects.toThrow(/không hợp lệ/i);
+    const order = await createOrder(orderInput([{ productId: first.id, productVariantId: chosen.id, qty: 1 }]));
+    await prisma.productVariant.update({ where: { id: chosen.id }, data: { name: "5 gấu", price: 650000 } });
+    let line = (await getOrder(order.id))!.items[0];
+    expect(line).toMatchObject({ variantNameSnapshot: "3 gấu", unitPriceSnapshot: 490000 });
+
+    await prisma.productVariant.delete({ where: { id: chosen.id } });
+    line = (await getOrder(order.id))!.items[0];
+    expect(line).toMatchObject({ productVariantId: null, variantNameSnapshot: "3 gấu", unitPriceSnapshot: 490000 });
+
+    await updateOrder(order.id, orderInput([{ id: line.id, productId: first.id, productVariantId: null, qty: 2 }]));
+    line = (await getOrder(order.id))!.items[0];
+    expect(line).toMatchObject({ qty: 2, productVariantId: null, variantNameSnapshot: "3 gấu", unitPriceSnapshot: 490000 });
+  });
+
   it("editing keeps existing line prices, prices new lines today, and removes dropped lines", async () => {
     const { red, box, bo } = await setup();
     const { id } = await createOrder(orderInput([{ productId: red.id, qty: 2 }, { productId: box.id, qty: 1 }]));

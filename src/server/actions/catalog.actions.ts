@@ -47,6 +47,16 @@ const productSchema = z.object({
   color: z.string().max(120).optional(),
   description: z.string().max(2000).optional(),
   isVisible: z.boolean(),
+  variants: z
+    .array(
+      z.object({
+        id: z.string().uuid().optional(),
+        name: z.string().max(120),
+        price: z.number().int().min(0).max(2_000_000_000).nullable(),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 export type ProductPayload = z.input<typeof productSchema>;

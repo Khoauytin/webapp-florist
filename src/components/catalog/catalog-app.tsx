@@ -19,6 +19,7 @@ export interface CatalogProduct {
   description: string | null;
   images: string[];
   categoryId: string;
+  variants: { id: string; name: string; price: number }[];
 }
 
 export interface ShopLinks {
@@ -31,9 +32,16 @@ export interface ShopLinks {
 }
 
 const money = (n: number) => n.toLocaleString("vi-VN") + "đ";
-const priceText = (p: CatalogProduct) => (p.price ? money(p.price) : "Liên hệ báo giá");
+const productPrice = (p: CatalogProduct, variant?: CatalogProduct["variants"][number] | null) => variant?.price ?? p.variants[0]?.price ?? p.price;
+const priceText = (p: CatalogProduct, variant?: CatalogProduct["variants"][number] | null) => {
+  const price = productPrice(p, variant);
+  return price === null ? "Liên hệ báo giá" : money(price);
+};
 const slugOf = (p: CatalogProduct) => p.code.toLowerCase();
-const orderMessage = (p: CatalogProduct) => `Mình muốn đặt mẫu ${p.code} · ${p.name}${p.price ? ` (${money(p.price)})` : ""}`;
+const orderMessage = (p: CatalogProduct, variant?: CatalogProduct["variants"][number] | null) => {
+  const price = productPrice(p, variant);
+  return `Mình muốn đặt mẫu ${p.code} · ${p.name}${variant ? ` · ${variant.name}` : ""}${price === null ? "" : ` (${money(price)})`}`;
+};
 
 const motionOK = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** The photo can fly from the card into the sheet only where View Transitions exist. */
@@ -113,6 +121,7 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
   const [active, setActive] = useState("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<CatalogProduct | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -139,6 +148,7 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
       }
       const p = bySlug(slug);
       setOpen(p);
+      setSelectedVariantId(p?.variants[0]?.id ?? null);
       setPicking(false);
     };
     sync();
@@ -220,6 +230,7 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
     const go = () => {
       history.pushState({ sheet: slugOf(p) }, "", "#" + slugOf(p));
       setPicking(false);
+      setSelectedVariantId(p.variants[0]?.id ?? null);
       setOpen(p);
     };
     sourcePhoto.current = photo ?? null;
@@ -298,7 +309,8 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
   // browsers (iOS Safari, in-app browsers) neither block the clipboard nor the new tab.
   const copyOrder = (kind: "messenger" | "zalo" | "tiktok") => {
     if (!open) return;
-    const msg = orderMessage(open);
+    const selectedVariant = open.variants.find((variant) => variant.id === selectedVariantId) ?? open.variants[0] ?? null;
+    const msg = orderMessage(open, selectedVariant);
     const done = linkFor(shop, kind) ? "Đã sao chép tin nhắn, dán vào khung chat để gửi" : `Đã sao chép tin nhắn. Shop chưa cập nhật ${missingLabel[kind]}.`;
     if (!navigator.clipboard) return toast(msg);
     navigator.clipboard.writeText(msg).then(
@@ -420,7 +432,14 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
         <Contact shop={shop} onMissing={toast} kind="tiktok" label="TikTok" />
       </nav>
 
-      <ProductSheet product={open} category={open ? catById.get(open.categoryId) : undefined} onClose={closeSheet} toast={open ? toastEl : null}>
+      <ProductSheet
+        product={open}
+        category={open ? catById.get(open.categoryId) : undefined}
+        selectedVariantId={selectedVariantId}
+        onVariantChange={setSelectedVariantId}
+        onClose={closeSheet}
+        toast={open ? toastEl : null}
+      >
         {open ? (
           picking ? (
             <div className="order-pick">
@@ -457,7 +476,23 @@ function resetDrag(d: HTMLDialogElement) {
 }
 
 /** Bottom sheet (dialog) with gallery, specs and the action area. */
-function ProductSheet({ product, category, onClose, toast, children }: { product: CatalogProduct | null; category?: CatalogCategory; onClose: () => void; toast: React.ReactNode; children: React.ReactNode }) {
+function ProductSheet({
+  product,
+  category,
+  selectedVariantId,
+  onVariantChange,
+  onClose,
+  toast,
+  children,
+}: {
+  product: CatalogProduct | null;
+  category?: CatalogCategory;
+  selectedVariantId: string | null;
+  onVariantChange: (id: string) => void;
+  onClose: () => void;
+  toast: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const gallery = useRef<HTMLDivElement>(null);
   // Keep the last product rendered while the sheet animates closed.
@@ -545,6 +580,7 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
   };
 
   const p = product ?? shown;
+  const selectedVariant = p?.variants.find((variant) => variant.id === selectedVariantId) ?? p?.variants[0] ?? null;
   const specs = p ? ([["Kích thước", p.size], ["Màu sắc", p.color]] as const).filter((s) => s[1]) : [];
   return (
     <dialog
@@ -611,7 +647,20 @@ function ProductSheet({ product, category, onClose, toast, children }: { product
                 <span className="info-cat">{category?.name}</span>
                 <h2 id="sheet-title">{p.name}</h2>
                 <p className="info-code">Mã mẫu {p.code}</p>
-                <p className="info-price">{priceText(p)}</p>
+                {p.variants.length ? (
+                  <div className="variant-options" role="group" aria-label="Chọn biến thể">
+                    {p.variants.map((variant, index) => (
+                      <button key={variant.id} type="button" className="variant-option" aria-pressed={variant.id === selectedVariant?.id} onClick={() => onVariantChange(variant.id)}>
+                        <span>
+                          {variant.name}
+                          {index === 0 ? <small>Mặc định</small> : null}
+                        </span>
+                        <b>{money(variant.price)}</b>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="info-price">{priceText(p, selectedVariant)}</p>
                 {specs.length ? (
                   <dl className="specs">
                     {specs.map(([k, v]) => (

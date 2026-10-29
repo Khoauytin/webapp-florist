@@ -2,7 +2,7 @@
 
 Bản 2 là công cụ cá nhân cho một người chủ shop:
 
-- **Trang khách** (`/`): khách xem mẫu hoa, giá, nhiều ảnh, tìm theo tên hoặc mã. Bấm "Đặt mẫu này" để sao chép tin nhắn đặt mẫu rồi mở Facebook, Zalo, TikTok, hoặc gọi điện. Không có giỏ hàng.
+- **Trang khách** (`/`): khách xem mẫu hoa, giá, biến thể (nếu có), nhiều ảnh, tìm theo tên hoặc mã. Bấm "Đặt mẫu này" để sao chép tin nhắn đặt mẫu rồi mở Facebook, Zalo, TikTok, hoặc gọi điện. Không có giỏ hàng.
 - **Trang quản trị** (`/admin`, đăng nhập ở `/admin/login`): đơn hàng theo lịch (ngày, tuần, tháng), màn Hôm nay, tổng hợp cần làm, sản phẩm và danh mục, khách hàng, thông tin liên hệ của shop.
 
 Tài liệu:
@@ -75,7 +75,8 @@ tests/                 domain/ (thuần) và integration/ (Postgres)
 Quy tắc chính:
 
 - Mã sản phẩm tự sinh theo tiền tố danh mục (`BO-055`), lấy số từ bảng `product_code_counters`, không bao giờ đổi.
-- Mỗi dòng đơn lưu mã, tên và giá lúc đặt. Sửa đơn chỉ đổi số lượng và ghi chú của dòng cũ, không tính lại giá.
+- Sản phẩm có thể có các card biến thể tự đặt tên và giá riêng; card đầu tiên là lựa chọn mặc định. Khi có biến thể, giá chính của sản phẩm không được dùng.
+- Mỗi dòng đơn lưu mã, tên, biến thể và giá lúc đặt. Sửa đơn chỉ đổi số lượng và ghi chú của dòng cũ, không tính lại giá.
 - "Cần làm", "Tiền cần thu" và Tổng hợp cần làm chỉ tính đơn **Mới**.
 
 ## Đưa lên mạng

@@ -7,6 +7,7 @@ export interface PickProduct {
   name: string;
   price: number | null;
   imageUrl: string | null;
+  variants: { id: string; name: string; price: number }[];
 }
 
 export interface PickCategory {
@@ -19,6 +20,8 @@ export interface FormLine {
   /** existing order line when editing (keeps its price snapshot) */
   id?: string;
   productId: string;
+  productVariantId: string | null;
+  variantName: string | null;
   code: string;
   name: string;
   price: number | null;

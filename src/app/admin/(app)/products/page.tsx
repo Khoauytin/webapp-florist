@@ -26,7 +26,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
     const s = p.toString();
     return s ? `/admin/products?${s}` : "/admin/products";
   };
-  const data = rows.map((r) => ({ id: r.id, code: r.code, name: r.name, price: r.price, isVisible: r.isVisible, imageUrl: r.images[0]?.url ?? null }));
+  const data = rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    price: r.variants[0]?.price ?? r.price,
+    variantCount: r.variants.length,
+    isVisible: r.isVisible,
+    imageUrl: r.images[0]?.url ?? null,
+  }));
 
   return (
     <>

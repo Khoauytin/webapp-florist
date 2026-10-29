@@ -13,6 +13,7 @@ export interface ProductRow {
   code: string;
   name: string;
   price: number | null;
+  variantCount: number;
   isVisible: boolean;
   imageUrl: string | null;
 }
@@ -57,6 +58,7 @@ export function ProductGrid({ rows }: { rows: ProductRow[] }) {
               {r.name}
             </Link>
             {r.price === null ? <span className="tag">Chưa có giá</span> : <span className="pr">{formatMoney(r.price)}</span>}
+            {r.variantCount ? <span className="variant-count">{r.variantCount} biến thể</span> : null}
             <label className="vis">
               Hiện trên web
               <Switch checked={vis[r.id]} onChange={(b) => toggle(r, b)} label={`Hiện ${r.name} trên web`} />
@@ -74,21 +76,22 @@ export function QuickEdit({ rows }: { rows: ProductRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   // Last saved values, so only edited rows are sent.
-  const [base, setBase] = useState(() => new Map(data.map((r) => [r.id, `${r.name}|${r.priceText}|${r.isVisible}`])));
-  const dirty = data.filter((r) => base.get(r.id) !== `${r.name}|${r.priceText}|${r.isVisible}`);
+  const signature = (r: (typeof data)[number]) => `${r.name}|${r.variantCount ? "variants" : r.priceText}|${r.isVisible}`;
+  const [base, setBase] = useState(() => new Map(data.map((r) => [r.id, signature(r)])));
+  const dirty = data.filter((r) => base.get(r.id) !== signature(r));
   const update = (id: string, patch: Partial<(typeof data)[number]>) => setData((d) => d.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const save = () =>
     start(async () => {
       setError(null);
       const payload = [];
       for (const r of dirty) {
-        const digits = r.priceText.replace(/[^\d]/g, "");
-        if (r.priceText.trim() && !digits) return setError(`Giá của ${r.code} không hợp lệ.`);
+        const digits = r.variantCount ? "" : r.priceText.replace(/[^\d]/g, "");
+        if (!r.variantCount && r.priceText.trim() && !digits) return setError(`Giá của ${r.code} không hợp lệ.`);
         payload.push({ id: r.id, name: r.name, price: digits ? Number(digits) : null, isVisible: r.isVisible });
       }
       const res = await quickUpdateAction(payload);
       if (!res.ok) return setError(res.error ?? "Không lưu được");
-      setBase((b) => new Map([...b, ...dirty.map((r) => [r.id, `${r.name}|${r.priceText}|${r.isVisible}`] as const)]));
+      setBase((b) => new Map([...b, ...dirty.map((r) => [r.id, signature(r)] as const)]));
       toast(res.message ?? "Đã lưu");
       router.refresh();
     });
@@ -108,10 +111,19 @@ export function QuickEdit({ rows }: { rows: ProductRow[] }) {
               <input className="input" id={`qn-${r.id}`} value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} maxLength={200} />
             </div>
             <div className="price">
-              <label className="sr" htmlFor={`qp-${r.id}`}>
-                Giá {r.code}
-              </label>
-              <input className="input" id={`qp-${r.id}`} inputMode="numeric" placeholder="Liên hệ" value={r.priceText} onChange={(e) => update(r.id, { priceText: e.target.value })} />
+              {r.variantCount ? (
+                <div className="quick-variant">
+                  <b>{r.variantCount} biến thể</b>
+                  <span>{r.price === null ? "Chưa có giá" : `Mặc định ${formatMoney(r.price)}`}</span>
+                </div>
+              ) : (
+                <>
+                  <label className="sr" htmlFor={`qp-${r.id}`}>
+                    Giá {r.code}
+                  </label>
+                  <input className="input" id={`qp-${r.id}`} inputMode="numeric" placeholder="Liên hệ" value={r.priceText} onChange={(e) => update(r.id, { priceText: e.target.value })} />
+                </>
+              )}
             </div>
             <Switch checked={r.isVisible} onChange={(b) => update(r.id, { isVisible: b })} label={`Hiện ${r.code} trên web`} />
           </div>

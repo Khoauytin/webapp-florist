@@ -20,6 +20,6 @@ export default async function NewOrderPage({ searchParams }: { searchParams: SP 
   }
   const [categoryRows, productRows] = await Promise.all([listCategories(), searchOrderableProducts("")]);
   const categories = categoryRows.map((c) => ({ id: c.id, name: c.name }));
-  const products = productRows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null }));
+  const products = productRows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null, variants: p.variants }));
   return <OrderForm orderId={null} initial={initial} initialProducts={products} categories={categories} />;
 }

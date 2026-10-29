@@ -135,6 +135,7 @@ model Product {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   images     ProductImage[]
+  variants   ProductVariant[]
   orderItems OrderItem[]
 
   @@index([categoryId, isVisible])
@@ -153,6 +154,22 @@ model ProductImage {
 
   @@index([productId, sortOrder])
   @@map("product_images")
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  price     Int
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  orderItems OrderItem[]
+
+  @@index([productId, sortOrder])
+  @@map("product_variants")
 }
 
 // ===== Customers & orders =====
@@ -231,13 +248,16 @@ model Order {
 }
 
 model OrderItem {
-  id                  String  @id @default(uuid()) @db.Uuid
-  orderId             String  @map("order_id") @db.Uuid
-  order               Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId           String  @map("product_id") @db.Uuid
-  product             Product @relation(fields: [productId], references: [id])
+  id                  String          @id @default(uuid()) @db.Uuid
+  orderId             String          @map("order_id") @db.Uuid
+  order               Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           String          @map("product_id") @db.Uuid
+  product             Product         @relation(fields: [productId], references: [id])
+  productVariantId    String?         @map("product_variant_id") @db.Uuid
+  productVariant      ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
   productCodeSnapshot String  @map("product_code_snapshot")
   nameSnapshot        String  @map("name_snapshot")
+  variantNameSnapshot String? @map("variant_name_snapshot")
   unitPriceSnapshot   Int     @map("unit_price_snapshot")
   qty                 Int
   note                String?
@@ -245,6 +265,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+  @@index([productVariantId])
   @@map("order_items")
 }
 

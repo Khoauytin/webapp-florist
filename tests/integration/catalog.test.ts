@@ -96,6 +96,57 @@ describe("visibility on the public site", () => {
     await expect(quickUpdate([{ id: p.id, name: " ", price: 1, isVisible: true }])).rejects.toThrow();
   });
 
+  it("stores ordered variant cards, uses their first price, and protects the hidden main price", async () => {
+    const bo = await makeCategory();
+    const product = await createProduct({
+      name: "Bó gấu",
+      categoryId: bo.id,
+      price: 300000,
+      isVisible: true,
+      variants: [
+        { name: "3 gấu", price: 490000 },
+        { name: "5 gấu", price: 650000 },
+      ],
+    });
+
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).toMatchObject({ price: null });
+    const created = await prisma.productVariant.findMany({ where: { productId: product.id }, orderBy: { sortOrder: "asc" } });
+    expect(created.map((variant) => [variant.name, variant.price, variant.sortOrder])).toEqual([
+      ["3 gấu", 490000, 0],
+      ["5 gấu", 650000, 1],
+    ]);
+
+    const publicProduct = (await publicCatalog())[0].products[0];
+    expect(publicProduct.variants.map((variant) => variant.name)).toEqual(["3 gấu", "5 gấu"]);
+    expect((await searchOrderableProducts(product.code))[0].variants[0]).toMatchObject({ name: "3 gấu", price: 490000 });
+
+    await prisma.product.update({ where: { id: product.id }, data: { price: 999 } });
+    await quickUpdate([{ id: product.id, name: "Bó gấu mới", price: 1, isVisible: false }]);
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).toMatchObject({ name: "Bó gấu mới", price: null, isVisible: false });
+
+    await updateProduct(product.id, {
+      name: "Bó gấu mới",
+      categoryId: bo.id,
+      price: 123,
+      isVisible: true,
+      variants: [
+        { id: created[1].id, name: "5 gấu", price: 690000 },
+        { name: "1 gấu", price: 390000 },
+      ],
+    });
+    const updated = await prisma.productVariant.findMany({ where: { productId: product.id }, orderBy: { sortOrder: "asc" } });
+    expect(updated.map((variant) => [variant.id, variant.name, variant.price])).toEqual([
+      [created[1].id, "5 gấu", 690000],
+      [expect.any(String), "1 gấu", 390000],
+    ]);
+    expect(await prisma.productVariant.findUnique({ where: { id: created[0].id } })).toBeNull();
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).price).toBeNull();
+
+    await updateProduct(product.id, { name: "Bó gấu mới", categoryId: bo.id, price: 420000, isVisible: true, variants: [] });
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).toMatchObject({ price: 420000 });
+    expect(await prisma.productVariant.count({ where: { productId: product.id } })).toBe(0);
+  });
+
   it("keeps archiving separate from permanent deletion", async () => {
     const category = await makeCategory();
     const product = await makeProduct(category.id);

@@ -20,7 +20,7 @@ export default async function NewProductPage() {
       <ProductForm
         productId={null}
         categories={categories.map((c) => ({ id: c.id, name: c.name, codePrefix: c.codePrefix }))}
-        initial={{ name: "", categoryId: first?.id ?? "", price: null, size: "", color: "", description: "", isVisible: true }}
+        initial={{ name: "", categoryId: first?.id ?? "", price: null, size: "", color: "", description: "", isVisible: true, variants: [] }}
         initialPreview={first ? await previewProductCode(first.id) : null}
       />
       <p className="muted small" style={{ marginTop: 12 }}>

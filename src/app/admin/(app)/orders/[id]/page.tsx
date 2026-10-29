@@ -131,6 +131,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <Thumb url={i.product.images[0]?.url} size={[56, 56]} />
               <div>
                 <div className="nm">{i.nameSnapshot}</div>
+                {i.variantNameSnapshot ? <div className="line-variant">{i.variantNameSnapshot}</div> : null}
                 <div className="meta">
                   {i.productCodeSnapshot} · {formatMoney(i.unitPriceSnapshot)} × {i.qty}
                 </div>

@@ -7,7 +7,7 @@ if (!process.env.DATABASE_URL?.includes("_test")) {
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE
-    order_items, orders, order_counters, product_images, products, product_code_counters,
+    order_items, orders, order_counters, product_variants, product_images, products, product_code_counters,
     categories, customers, shop_settings, sessions, accounts, verifications, users
     RESTART IDENTITY CASCADE`);
 }

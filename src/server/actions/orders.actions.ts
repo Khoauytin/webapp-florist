@@ -35,7 +35,16 @@ const orderSchema = z.object({
   cardMessage: optText(500),
   note: optText(2000),
   items: z
-    .array(z.object({ id: z.string().uuid().nullable().optional(), productId: z.string().uuid(), unitPrice: money.nullable().optional(), qty: z.number().int().min(1).max(10000), note: optText(300) }))
+    .array(
+      z.object({
+        id: z.string().uuid().nullable().optional(),
+        productId: z.string().uuid(),
+        productVariantId: z.string().uuid().nullable().optional(),
+        unitPrice: money.nullable().optional(),
+        qty: z.number().int().min(1).max(10000),
+        note: optText(300),
+      }),
+    )
     .min(1, "Đơn hàng cần ít nhất một mẫu")
     .max(50),
 });
@@ -114,7 +123,7 @@ export async function searchProductsAction(q: string, categoryId?: string | null
   await actionUser();
   const category = isUuid(categoryId) ? categoryId : undefined;
   const rows = await searchOrderableProducts(String(q).slice(0, 100), { categoryId: category });
-  return rows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null }));
+  return rows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null, variants: p.variants }));
 }
 
 export async function findCustomerAction(phone: string) {

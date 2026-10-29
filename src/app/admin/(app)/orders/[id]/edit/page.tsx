@@ -41,6 +41,8 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
       key: i.id,
       id: i.id,
       productId: i.productId,
+      productVariantId: i.productVariantId,
+      variantName: i.variantNameSnapshot,
       code: i.productCodeSnapshot,
       name: i.nameSnapshot,
       price: i.unitPriceSnapshot,
@@ -52,6 +54,6 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   };
   const [categoryRows, productRows] = await Promise.all([listCategories(), searchOrderableProducts("")]);
   const categories = categoryRows.map((c) => ({ id: c.id, name: c.name }));
-  const products = productRows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null }));
+  const products = productRows.map((p) => ({ id: p.id, code: p.code, name: p.name, price: p.price, imageUrl: p.images[0]?.url ?? null, variants: p.variants }));
   return <OrderForm orderId={o.id} code={o.code} initial={initial} initialProducts={products} categories={categories} />;
 }

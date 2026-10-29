@@ -18,7 +18,7 @@ Shop làm hoa theo đơn, không làm sẵn, nên **không có tồn kho**. Mộ
 
 - Giữ giao diện catalog hiện tại (ảnh hero, tab danh mục, lưới ảnh 3:4, bảng chi tiết trượt từ dưới lên). Dữ liệu lấy từ database thay vì viết cứng trong HTML.
 - Có ô tìm kiếm theo tên mẫu.
-- Mỗi mẫu hiện tên, mã mẫu, giá, nhiều ảnh, kích thước, màu sắc, mô tả. Mẫu chưa có giá hiện "Liên hệ báo giá".
+- Mỗi mẫu hiện tên, mã mẫu, giá, nhiều ảnh, kích thước, màu sắc, mô tả. Mẫu chưa có giá hiện "Liên hệ báo giá". Mẫu có biến thể cho khách chọn card tên tự do (ví dụ Size S, 3 gấu) với giá riêng; card đầu tiên được chọn mặc định và là giá hiện trên lưới.
 - Mẫu hoặc danh mục đang tắt "Hiện trên web" thì không xuất hiện.
 - **Đặt mẫu:** trong chi tiết mẫu có nút "Đặt mẫu này", mở bảng chọn kênh:
   - Facebook (Messenger), Zalo, TikTok: trang tự sao chép sẵn tin nhắn, ví dụ "Mình muốn đặt mẫu BO-012 · Hoa bó hồng pastel (350.000đ)", rồi mở kênh chat. Khách chỉ cần dán và gửi. Lý do: các kênh này không cho điền sẵn nội dung tin nhắn qua đường link.
@@ -39,9 +39,9 @@ Thanh điều hướng dưới: **Tổng quan · Lịch · (+) Tạo đơn · S�
 | Hôm nay | Các đơn có ngày giao hôm nay, xếp theo giờ. Không có đơn thì ghi "Hôm nay không có đơn". |
 | Lịch | Xem theo tháng hoặc tuần, chọn tháng và năm. Mỗi ngày có chấm màu theo trạng thái các đơn. Bấm một ngày thì hiện danh sách đơn của ngày đó ngay dưới lịch. Có khối **Tổng hợp cần làm** của khoảng đang xem. |
 | Chi tiết đơn | Mở khi bấm vào một đơn ở bất cứ đâu. Hiện: mã đơn, trạng thái, giờ tạo, hạn giao, khách (tên, số điện thoại, địa chỉ), người nhận, hình thức nhận, người giao, các sản phẩm (ảnh, tên, số lượng, đơn giá, ghi chú từng dòng), lời chúc, ghi chú, tổng tiền, đã cọc, còn lại. Nút chuyển trạng thái, Sửa, Hủy, Xóa. |
-| Tạo / sửa đơn | Tìm khách theo số điện thoại (khách mới tự tạo), lọc mẫu theo danh mục, tìm theo tên hoặc mã, chọn mẫu trong lưới ảnh dọc 3:4, chỉnh số lượng. Mẫu "Liên hệ báo giá" vẫn chọn được và phải nhập đơn giá đã báo khách. Có ngày giao (bắt buộc), giờ giao, hình thức nhận, địa chỉ, người nhận, người giao, phí ship, giảm giá, đã cọc, lời chúc, ghi chú. Thanh tổng tiền cố định ở cuối. |
-| Sản phẩm | Lưới 2 cột có ảnh dọc 3:4 giống trang khách, lọc theo danh mục, tìm kiếm, công tắc "Hiện trên web". Chế độ **Sửa nhanh**: bảng sửa tên, giá và công tắc hiện trên web ngay trên từng dòng. |
-| Thêm / sửa sản phẩm | Tên, danh mục, giá (để trống là "Liên hệ báo giá"), kích thước, màu sắc, mô tả, ảnh (nhiều ảnh, chọn ảnh chính), hiện trên web, lưu trữ và xóa vĩnh viễn. **Không có ô nhập mã**: mã tự sinh khi lưu. |
+| Tạo / sửa đơn | Tìm khách theo số điện thoại (khách mới tự tạo), lọc mẫu theo danh mục, tìm theo tên hoặc mã, chọn mẫu trong lưới ảnh dọc 3:4, chọn biến thể và chỉnh số lượng. Mẫu có biến thể mặc định chọn card đầu tiên; các biến thể khác tạo dòng riêng. Mẫu "Liên hệ báo giá" vẫn chọn được và phải nhập đơn giá đã báo khách. Có ngày giao (bắt buộc), giờ giao, hình thức nhận, địa chỉ, người nhận, người giao, phí ship, giảm giá, đã cọc, lời chúc, ghi chú. Thanh tổng tiền cố định ở cuối. |
+| Sản phẩm | Lưới 2 cột có ảnh dọc 3:4 giống trang khách, lọc theo danh mục, tìm kiếm, công tắc "Hiện trên web". Chế độ **Sửa nhanh**: bảng sửa tên, giá và công tắc hiện trên web ngay trên từng dòng; sản phẩm có biến thể chỉ hiện số biến thể và không cho sửa giá chính. |
+| Thêm / sửa sản phẩm | Tên, danh mục, giá (để trống là "Liên hệ báo giá"), hoặc các card biến thể tên tự do và giá riêng; có thể thêm, xóa, đổi thứ tự card. Khi có biến thể thì ẩn và không dùng giá chính, card đầu tiên là mặc định. Các trường còn lại: kích thước, màu sắc, mô tả, ảnh (nhiều ảnh, chọn ảnh chính), hiện trên web, lưu trữ và xóa vĩnh viễn. **Không có ô nhập mã**: mã tự sinh khi lưu. |
 | Danh mục | Tên, tiền tố mã, thứ tự hiển thị, hiện trên web và xóa danh mục trống. Mở từ màn hình Sản phẩm. |
 | Khách hàng | Danh sách, tìm theo tên hoặc số điện thoại. Chi tiết khách: thông tin, số đơn, tổng tiền đơn hoàn thành, danh sách đơn. |
 | Thông tin shop | Các chỉ số toàn hệ thống gồm **Tổng doanh thu** của đơn Hoàn thành, **Tổng công việc**, **Tỷ lệ hủy đơn**, và **Top 5 sản phẩm bán chạy** có thể xếp theo số lượng hoặc doanh thu. Bên dưới là tên shop, số điện thoại, link Facebook, Messenger, Zalo, TikTok dùng cho trang khách. Sửa được trên giao diện, không cần sửa code. Mở từ ảnh đại diện. |
@@ -64,7 +64,7 @@ Thanh điều hướng dưới: **Tổng quan · Lịch · (+) Tạo đơn · S�
 - Tổng tiền = Σ(đơn giá × số lượng) − giảm giá + phí ship.
 - **Đã cọc** là một số tiền, sửa được bất cứ lúc nào. Khách trả nốt thì sửa đã cọc bằng tổng tiền.
 - Còn lại = tổng tiền − đã cọc. Đã cọc không được lớn hơn tổng tiền.
-- Mỗi dòng đơn lưu tên và giá **tại thời điểm đặt**. Sửa giá sản phẩm sau đó không làm đổi đơn cũ.
+- Mỗi dòng đơn lưu tên sản phẩm, tên biến thể (nếu có) và giá **tại thời điểm đặt**. Sửa hoặc xóa biến thể, hay sửa giá sản phẩm sau đó, không làm đổi đơn cũ.
 - Tổng doanh thu toàn hệ thống = tổng tiền của các đơn Hoàn thành. Tổng công việc = số lượng mọi đơn đang lưu trong hệ thống, gồm cả đơn Hủy.
 - Tỷ lệ hủy đơn = số đơn Hủy / tổng số đơn đang lưu; khi chưa có đơn thì bằng 0%.
 - Top 5 sản phẩm bán chạy chỉ tính các dòng sản phẩm của đơn Hoàn thành. Có thể xếp theo tổng số lượng hoặc doanh thu sản phẩm (`số lượng × đơn giá tại thời điểm đặt`).
@@ -105,9 +105,10 @@ Thanh điều hướng dưới: **Tổng quan · Lịch · (+) Tạo đơn · S�
 | `categories` | Tên, tiền tố mã, thứ tự, hiện trên web. |
 | `products` | Mã (tự sinh, duy nhất), tên, danh mục, giá (cho phép trống), kích thước, màu sắc, mô tả, hiện trên web, lưu trữ. |
 | `product_images` | Như bản cũ. |
+| `product_variants` | Card biến thể của sản phẩm: tên tự do, giá, thứ tự. Card đầu tiên theo thứ tự là mặc định. |
 | `customers` | Tên, số điện thoại (duy nhất), địa chỉ, ghi chú. |
 | `orders` | Mã đơn tự sinh (DH-yymmdd-NNN), khách, người nhận, số điện thoại người nhận, kênh đặt (Facebook, Zalo, TikTok, Điện thoại, Tại tiệm), hình thức nhận, địa chỉ, **ngày giao (bắt buộc)**, giờ giao từ và đến, người giao, phí ship, giảm giá, tạm tính, tổng tiền, **đã cọc**, lời chúc, ghi chú, trạng thái, thời điểm giao, hoàn thành, hủy. |
-| `order_items` | Sản phẩm, mã, tên và đơn giá lúc đặt, số lượng, ghi chú dòng. |
+| `order_items` | Sản phẩm, biến thể được chọn (cho phép trống nếu card bị xóa), mã, tên sản phẩm, tên biến thể và đơn giá lúc đặt, số lượng, ghi chú dòng. |
 | `order_counters` | Như bản cũ, để sinh mã đơn không trùng. |
 
 **Bỏ:** `inventory_movements`, `payments`, `audit_logs`, các cột tồn kho (đang có, đã giữ), phương thức đáp ứng, giá vốn, các cột phân bổ và số đã làm trên dòng đơn, dòng tự do.
@@ -135,6 +136,7 @@ Code dùng lại từ bản cũ: đăng nhập, xử lý ngày giờ, định d�
 9. Màn hình Hôm nay liệt kê đúng đơn của hôm nay, hoặc hiện "Hôm nay không có đơn".
 10. Đổi giá sản phẩm không làm đổi tiền của đơn cũ.
 11. Giao diện dùng tốt ở màn hình điện thoại 375px, không tràn ngang.
+12. Chủ shop tạo được nhiều card biến thể có tên và giá riêng; trang khách và form đơn mặc định card đầu tiên, còn đơn cũ giữ nguyên snapshot khi card bị sửa hoặc xóa.
 
 ## 8. Ngoài phạm vi
 
@@ -152,6 +154,7 @@ Thanh toán online, form hoặc giỏ đặt hàng cho khách, nhắc việc qua
 
 ## 10. Ghi chú khi xây (27/10/2026)
 
+- **Biến thể sản phẩm:** chủ shop tự đặt tên và giá cho tối đa 20 card, đổi thứ tự bằng nút lên/xuống. Thêm card đầu tiên sao chép giá chính hiện tại để tránh mất giá; xóa hết card thì ô giá chính xuất hiện lại.
 - **Mẫu chưa có giá vẫn thêm được vào đơn.** Khi chọn mẫu "Liên hệ báo giá", form yêu cầu chủ shop nhập đơn giá đã báo khách trước khi lưu; giá này được lưu vào snapshot của dòng đơn để tổng tiền và đơn cũ luôn đúng.
 - **Database mới** `florist_v2` và `florist_v2_test` thay vì xóa và tạo lại database cũ; database của bản 1 vẫn còn nguyên.
 - **Tìm trên trang khách** theo cả tên và mã mẫu.

@@ -28,7 +28,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           productId={p.id}
           code={p.code}
           categories={categories.map((c) => ({ id: c.id, name: c.name, codePrefix: c.codePrefix }))}
-          initial={{ name: p.name, categoryId: p.categoryId, price: p.price, size: p.size ?? "", color: p.color ?? "", description: p.description ?? "", isVisible: p.isVisible }}
+          initial={{
+            name: p.name,
+            categoryId: p.categoryId,
+            price: p.price,
+            size: p.size ?? "",
+            color: p.color ?? "",
+            description: p.description ?? "",
+            isVisible: p.isVisible,
+            variants: p.variants.map((variant) => ({ id: variant.id, key: variant.id, name: variant.name, price: variant.price })),
+          }}
           initialPreview={null}
         />
       </div>

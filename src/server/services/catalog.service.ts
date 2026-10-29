@@ -109,13 +109,23 @@ export async function listProducts(f: ProductFilter) {
   const where: Prisma.ProductWhereInput = {
     isArchived: false,
     ...(f.categoryId ? { categoryId: f.categoryId } : {}),
-    ...(f.visibility === "visible" ? { isVisible: true } : f.visibility === "hidden" ? { isVisible: false } : f.visibility === "noprice" ? { price: null } : {}),
+    ...(f.visibility === "visible"
+      ? { isVisible: true }
+      : f.visibility === "hidden"
+        ? { isVisible: false }
+        : f.visibility === "noprice"
+          ? { price: null, variants: { none: {} } }
+          : {}),
     ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { code: { contains: q, mode: "insensitive" } }] } : {}),
   };
   return prisma.product.findMany({
     where,
     orderBy: [{ category: { sortOrder: "asc" } }, { code: "asc" }],
-    include: { category: { select: { name: true } }, images: { where: { isPrimary: true }, select: { url: true }, take: 1 } },
+    include: {
+      category: { select: { name: true } },
+      images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
+      variants: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, price: true } },
+    },
   });
 }
 
@@ -127,8 +137,18 @@ export async function productCounts() {
 export async function getProduct(id: string) {
   return prisma.product.findUnique({
     where: { id },
-    include: { category: true, images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] } },
+    include: {
+      category: true,
+      images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] },
+      variants: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, price: true } },
+    },
   });
+}
+
+export interface ProductVariantInput {
+  id?: string;
+  name: string;
+  price: number | null;
 }
 
 export interface ProductInput {
@@ -139,6 +159,7 @@ export interface ProductInput {
   color?: string;
   description?: string;
   isVisible: boolean;
+  variants?: ProductVariantInput[];
 }
 
 function cleanProduct(input: ProductInput) {
@@ -147,6 +168,13 @@ function cleanProduct(input: ProductInput) {
   if (!name) errors.name = "Bắt buộc";
   if (!input.categoryId) errors.categoryId = "Chọn danh mục";
   if (input.price !== null && (!Number.isInteger(input.price) || input.price < 0 || input.price > 2_000_000_000)) errors.price = "Giá không hợp lệ";
+  const variants = input.variants?.map((variant) => ({ id: variant.id, name: variant.name.trim(), price: variant.price }));
+  if (variants && variants.length > 20) errors.variants = "Tối đa 20 biến thể cho một sản phẩm";
+  if (variants?.some((variant) => !variant.name)) errors.variants = "Mỗi biến thể cần có tên";
+  if (variants?.some((variant) => variant.name.length > 120)) errors.variants = "Tên biến thể tối đa 120 ký tự";
+  if (variants?.some((variant) => variant.price === null || !Number.isInteger(variant.price) || variant.price < 0 || variant.price > 2_000_000_000)) errors.variants = "Mỗi biến thể cần có giá hợp lệ";
+  const variantNames = variants?.map((variant) => variant.name.toLocaleLowerCase("vi"));
+  if (variantNames && new Set(variantNames).size !== variantNames.length) errors.variants = "Tên biến thể không được trùng nhau";
   if (Object.keys(errors).length) throw new AppError("Vui lòng kiểm tra lại thông tin sản phẩm.", errors);
   return {
     name,
@@ -156,6 +184,7 @@ function cleanProduct(input: ProductInput) {
     color: input.color?.trim() || null,
     description: input.description?.trim() || null,
     isVisible: input.isVisible,
+    variants: variants?.map((variant) => ({ ...variant, price: variant.price! })),
   };
 }
 
@@ -166,15 +195,44 @@ export async function createProduct(input: ProductInput) {
     const cat = await tx.category.findUnique({ where: { id: data.categoryId } });
     if (!cat) throw new AppError("Danh mục không tồn tại.", { categoryId: "Chọn danh mục" });
     const code = await nextProductCode(tx, cat.codePrefix);
-    return tx.product.create({ data: { ...data, code } });
+    const { variants = [], ...product } = data;
+    return tx.product.create({
+      data: {
+        ...product,
+        price: variants.length ? null : product.price,
+        code,
+        ...(variants.length ? { variants: { create: variants.map(({ name, price }, sortOrder) => ({ name, price, sortOrder })) } } : {}),
+      },
+    });
   });
 }
 
 export async function updateProduct(id: string, input: ProductInput) {
   const data = cleanProduct(input);
-  const exists = await prisma.product.findUnique({ where: { id } });
-  if (!exists) throw new NotFoundError("Không tìm thấy sản phẩm.");
-  return prisma.product.update({ where: { id }, data });
+  return prisma.$transaction(async (tx) => {
+    const exists = await tx.product.findUnique({ where: { id }, include: { variants: { select: { id: true } } } });
+    if (!exists) throw new NotFoundError("Không tìm thấy sản phẩm.");
+    const { variants, ...product } = data;
+    const nextVariants = variants ?? exists.variants;
+    await tx.product.update({ where: { id }, data: { ...product, price: nextVariants.length ? null : product.price } });
+
+    if (variants) {
+      const existingIds = new Set(exists.variants.map((variant) => variant.id));
+      const submittedIds = variants.flatMap((variant) => (variant.id ? [variant.id] : []));
+      if (new Set(submittedIds).size !== submittedIds.length || submittedIds.some((variantId) => !existingIds.has(variantId))) {
+        throw new AppError("Danh sách biến thể đã thay đổi. Hãy tải lại trang rồi thử lại.", { variants: "Biến thể không hợp lệ" });
+      }
+      await tx.productVariant.deleteMany({ where: { productId: id, id: { notIn: submittedIds } } });
+      for (const [sortOrder, variant] of variants.entries()) {
+        if (variant.id) {
+          await tx.productVariant.update({ where: { id: variant.id }, data: { name: variant.name, price: variant.price, sortOrder } });
+        } else {
+          await tx.productVariant.create({ data: { productId: id, name: variant.name, price: variant.price, sortOrder } });
+        }
+      }
+    }
+    return tx.product.findUniqueOrThrow({ where: { id } });
+  });
 }
 
 export async function setProductVisible(id: string, isVisible: boolean) {
@@ -218,7 +276,17 @@ export async function quickUpdate(rows: QuickEditRow[]) {
     if (!r.name.trim()) throw new AppError("Tên sản phẩm không được để trống.");
     if (r.price !== null && (!Number.isInteger(r.price) || r.price < 0 || r.price > 2_000_000_000)) throw new AppError(`Giá của "${r.name}" không hợp lệ.`);
   }
-  await prisma.$transaction(rows.map((r) => prisma.product.update({ where: { id: r.id }, data: { name: r.name.trim(), price: r.price, isVisible: r.isVisible } })));
+  const products = await prisma.product.findMany({ where: { id: { in: rows.map((row) => row.id) } }, select: { id: true, _count: { select: { variants: true } } } });
+  const variantCount = new Map(products.map((product) => [product.id, product._count.variants]));
+  if (products.length !== rows.length) throw new AppError("Có sản phẩm không còn tồn tại. Hãy tải lại trang.");
+  await prisma.$transaction(
+    rows.map((r) =>
+      prisma.product.update({
+        where: { id: r.id },
+        data: { name: r.name.trim(), price: variantCount.get(r.id) ? null : r.price, isVisible: r.isVisible },
+      }),
+    ),
+  );
   return rows.length;
 }
 
@@ -239,6 +307,7 @@ export async function searchOrderableProducts(q: string, options: { categoryId?:
       name: true,
       price: true,
       images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
+      variants: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, price: true } },
     },
   });
 }
@@ -254,7 +323,10 @@ export async function publicCatalog() {
       products: {
         where: { isVisible: true, isArchived: false },
         orderBy: { code: "asc" },
-        include: { images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], select: { url: true } } },
+        include: {
+          images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], select: { url: true } },
+          variants: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, price: true } },
+        },
       },
     },
   });

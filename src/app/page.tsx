@@ -30,6 +30,7 @@ export default async function HomePage() {
       description: p.description,
       images: p.images.map((i) => i.url),
       categoryId: c.id,
+      variants: p.variants.map((variant) => ({ id: variant.id, name: variant.name, price: variant.price })),
     })),
   );
   return (

@@ -80,7 +80,12 @@ export function OrderForm({
   const shown = q || categoryId ? results : initialProducts;
   const isSearching = !!(q || categoryId) && searching;
   const selectedQty = new Map<string, number>();
+  const selectedVariantQty = new Map<string, number>();
   for (const line of v.lines) selectedQty.set(line.productId, (selectedQty.get(line.productId) ?? 0) + line.qty);
+  for (const line of v.lines) {
+    const key = `${line.productId}:${line.productVariantId ?? ""}`;
+    selectedVariantQty.set(key, (selectedVariantQty.get(key) ?? 0) + line.qty);
+  }
 
   const lookup = async () => {
     if (v.customerPhone.replace(/\D/g, "").length < 9) return;
@@ -95,14 +100,27 @@ export function OrderForm({
       setFound(null);
     }
   };
-  const add = (p: PickProduct) => {
+  const add = (p: PickProduct, variant = p.variants[0] ?? null) => {
     setV((s) => {
-      const existing = s.lines.find((l) => l.productId === p.id && !l.id);
+      const existing = s.lines.find((l) => l.productId === p.id && l.productVariantId === (variant?.id ?? null) && !l.id);
       if (existing) return { ...s, lines: s.lines.map((l) => (l === existing ? { ...l, qty: Math.min(10000, l.qty + 1) } : l)) };
-      const line: FormLine = { key: newKey(), productId: p.id, code: p.code, name: p.name, price: p.price, isPriceEditable: p.price === null, imageUrl: p.imageUrl, qty: 1, note: "" };
+      const line: FormLine = {
+        key: newKey(),
+        productId: p.id,
+        productVariantId: variant?.id ?? null,
+        variantName: variant?.name ?? null,
+        code: p.code,
+        name: p.name,
+        price: variant?.price ?? p.price,
+        isPriceEditable: !variant && p.price === null,
+        imageUrl: p.imageUrl,
+        qty: 1,
+        note: "",
+      };
       return { ...s, lines: [...s.lines, line] };
     });
-    toast(p.price === null ? `Đã thêm ${p.name} · nhập đơn giá bên dưới` : `Đã thêm ${p.name}`);
+    const price = variant?.price ?? p.price;
+    toast(price === null ? `Đã thêm ${p.name} · nhập đơn giá bên dưới` : `Đã thêm ${p.name}${variant ? ` · ${variant.name}` : ""}`);
   };
   const updateLine = (key: string, patch: Partial<FormLine>) => setV((s) => ({ ...s, lines: s.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
   const updateQuotedPrice = (key: string, price: number | null) => {
@@ -149,7 +167,14 @@ export function OrderForm({
         deposit: v.deposit,
         cardMessage: v.cardMessage,
         note: v.note,
-        items: v.lines.map((l) => ({ id: l.id ?? null, productId: l.productId, unitPrice: l.isPriceEditable ? l.price : undefined, qty: l.qty, note: l.note || undefined })),
+        items: v.lines.map((l) => ({
+          id: l.id ?? null,
+          productId: l.productId,
+          productVariantId: l.productVariantId,
+          unitPrice: l.isPriceEditable ? l.price : undefined,
+          qty: l.qty,
+          note: l.note || undefined,
+        })),
       });
       if (r.ok) {
         toast(r.message ?? "Đã lưu");
@@ -268,15 +293,34 @@ export function OrderForm({
             {!isSearching && shown.length ? (
               shown.map((p) => {
                 const qty = selectedQty.get(p.id) ?? 0;
+                const firstVariant = p.variants[0] ?? null;
+                const shownPrice = firstVariant?.price ?? p.price;
                 return (
-                  <button key={p.id} className="pick" type="button" onClick={() => add(p)} aria-pressed={qty > 0} aria-label={`Thêm ${p.name}${qty ? `, đang có ${qty}` : ""}`}>
-                    <span className="pick-photo">
-                      <Pic url={p.imageUrl} w={0} h={0} />
-                      {qty ? <span className="pick-count">{qty}</span> : null}
-                    </span>
-                    <span className="nm">{p.name}</span>
-                    <span className="pr">{p.price === null ? "Liên hệ báo giá" : formatMoney(p.price)}</span>
-                  </button>
+                  <div key={p.id} className="pick-wrap">
+                    <button className="pick" type="button" onClick={() => add(p)} aria-pressed={qty > 0} aria-label={`Thêm ${p.name}${firstVariant ? `, ${firstVariant.name}` : ""}${qty ? `, đang có ${qty}` : ""}`}>
+                      <span className="pick-photo">
+                        <Pic url={p.imageUrl} w={0} h={0} />
+                        {qty ? <span className="pick-count">{qty}</span> : null}
+                      </span>
+                      <span className="nm">{p.name}</span>
+                      {firstVariant ? <span className="pick-default">Mặc định · {firstVariant.name}</span> : null}
+                      <span className="pr">{shownPrice === null ? "Liên hệ báo giá" : formatMoney(shownPrice)}</span>
+                    </button>
+                    {p.variants.length ? (
+                      <div className="pick-variants" role="group" aria-label={`Chọn biến thể ${p.name}`}>
+                        {p.variants.map((variant) => {
+                          const variantQty = selectedVariantQty.get(`${p.id}:${variant.id}`) ?? 0;
+                          return (
+                            <button key={variant.id} type="button" aria-pressed={variantQty > 0} onClick={() => add(p, variant)}>
+                              <span>{variant.name}</span>
+                              <b>{formatMoney(variant.price)}</b>
+                              {variantQty ? <small>× {variantQty}</small> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })
             ) : (
@@ -291,6 +335,7 @@ export function OrderForm({
                   <div className="top">
                     <div>
                       <b>{l.name}</b>
+                      {l.variantName ? <div className="line-variant">{l.variantName}</div> : null}
                       <div className="muted xs">
                         {l.code} · {l.id ? "Giá lúc đặt" : l.isPriceEditable ? "Giá báo khách" : "Giá catalog"}
                       </div>

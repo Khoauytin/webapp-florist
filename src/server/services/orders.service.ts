@@ -14,6 +14,8 @@ export interface OrderItemInput {
   /** existing order line when editing; its name/price snapshot is kept */
   id?: string | null;
   productId: string;
+  /** selected variant for a variant product; omitted selects its first card */
+  productVariantId?: string | null;
   /** quoted price for a new catalog item that has no listed price */
   unitPrice?: number | null;
   qty: number;
@@ -116,15 +118,30 @@ async function resolveCustomer(tx: Tx, input: OrderInput) {
 
 /** Snapshots for new lines. Hidden and unpriced products can be ordered; archived ones cannot. */
 async function snapshotNewLines(tx: Tx, items: OrderItemInput[]) {
-  const products = await tx.product.findMany({ where: { id: { in: items.map((i) => i.productId) } } });
+  const products = await tx.product.findMany({
+    where: { id: { in: items.map((i) => i.productId) } },
+    include: { variants: { orderBy: { sortOrder: "asc" } } },
+  });
   const byId = new Map(products.map((p) => [p.id, p]));
   return items.map((item) => {
     const p = byId.get(item.productId);
     if (!p || p.isArchived) throw new AppError("Có mẫu không còn bán. Hãy xóa dòng đó khỏi đơn.");
-    const unitPrice = item.unitPrice ?? p.price;
+    const variant = item.productVariantId ? p.variants.find((row) => row.id === item.productVariantId) : p.variants[0];
+    if (p.variants.length && !variant) throw new AppError(`Biến thể của mẫu "${p.name}" không hợp lệ. Hãy chọn lại.`, { items: `Chọn lại biến thể cho "${p.name}"` });
+    if (!p.variants.length && item.productVariantId) throw new AppError(`Mẫu "${p.name}" không có biến thể. Hãy chọn lại.`, { items: `Chọn lại mẫu "${p.name}"` });
+    const unitPrice = variant?.price ?? item.unitPrice ?? p.price;
     if (unitPrice === null || unitPrice === undefined) throw new AppError(`Vui lòng nhập đơn giá cho mẫu "${p.name}".`, { items: `Nhập đơn giá cho "${p.name}"` });
     if (!Number.isInteger(unitPrice) || unitPrice < 0 || unitPrice > 2_000_000_000) throw new AppError(`Đơn giá của mẫu "${p.name}" không hợp lệ.`, { items: "Đơn giá không hợp lệ" });
-    return { productId: p.id, productCodeSnapshot: p.code, nameSnapshot: p.name, unitPriceSnapshot: unitPrice, qty: item.qty, note: blank(item.note) };
+    return {
+      productId: p.id,
+      productVariantId: variant?.id ?? null,
+      productCodeSnapshot: p.code,
+      nameSnapshot: p.name,
+      variantNameSnapshot: variant?.name ?? null,
+      unitPriceSnapshot: unitPrice,
+      qty: item.qty,
+      note: blank(item.note),
+    };
   });
 }
 
