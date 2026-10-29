@@ -22,6 +22,8 @@ export interface FormLine {
   productId: string;
   productVariantId: string | null;
   variantName: string | null;
+  /** variants a new line can switch between; existing lines keep their snapshot */
+  variants?: PickProduct["variants"];
   code: string;
   name: string;
   price: number | null;

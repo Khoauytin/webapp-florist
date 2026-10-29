@@ -155,14 +155,11 @@ export function ProductForm({
       )}
       <section className="variant-editor" aria-labelledby="variant-title">
         <div className="variant-editor-head">
-          <div>
-            <h2 id="variant-title">Biến thể</h2>
-            <p className="hint">Dùng cho size hoặc lựa chọn như 1 gấu, 3 gấu. Mỗi card có giá riêng.</p>
-          </div>
+          <h2 id="variant-title">Biến thể</h2>
           {!v.variants.length ? (
             <button className="btn btn-light btn-sm" type="button" onClick={addVariant}>
               <Icon name="plus" className="icon-sm" />
-              Thêm biến thể
+              Thêm lựa chọn
             </button>
           ) : null}
         </div>
@@ -207,12 +204,10 @@ export function ProductForm({
             ))}
             <button className="btn btn-light btn-block" type="button" onClick={addVariant} disabled={v.variants.length >= 20}>
               <Icon name="plus" />
-              {v.variants.length >= 20 ? "Đã đủ 20 biến thể" : "Thêm card biến thể"}
+              {v.variants.length >= 20 ? "Đã đủ 20 lựa chọn" : "Thêm lựa chọn"}
             </button>
           </div>
-        ) : (
-          <p className="muted small">Không bắt buộc. Nếu thêm biến thể, giá chính phía trên sẽ không được sử dụng.</p>
-        )}
+        ) : null}
       </section>
       <div className="row2">
         <Field label="Kích thước" htmlFor="psz">

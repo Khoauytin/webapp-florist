@@ -311,11 +311,14 @@ img { display: block; max-width: 100%; }
 .hint { font-size: 0.8125rem; color: var(--muted); }
 .input, .textarea, .fselect { width: 100%; min-height: 48px; padding: 0 var(--s4); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); font-size: 1rem; }
 .textarea { padding: var(--s3) var(--s4); min-height: 88px; resize: vertical; }
+/* iOS Safari gives date/time inputs an intrinsic width and centred text, which overflows half-width grid cells. */
+.input[type="date"], .input[type="time"] { display: block; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; text-align: left; line-height: 46px; }
+.input[type="date"]::-webkit-date-and-time-value, .input[type="time"]::-webkit-date-and-time-value { text-align: left; }
+.row2 > * { min-width: 0; }
 .input:focus-visible, .textarea:focus-visible, .fselect:focus-visible { outline-offset: 0; border-color: var(--accent); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .found { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s3) var(--s4); border-radius: 14px; background: var(--lav); color: var(--lav-ink); }
 .picker-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px var(--s3); align-items: start; }
-.pick-wrap { min-width: 0; display: grid; gap: var(--s2); }
 .pick { min-width: 0; border: 0; background: none; padding: 0; text-align: left; -webkit-tap-highlight-color: transparent; }
 .pick-photo { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 18px; background: var(--sunken); transition: transform 150ms var(--ease), box-shadow 150ms var(--ease); }
 .pick-photo img, .pick-photo .noimg { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
@@ -323,15 +326,8 @@ img { display: block; max-width: 100%; }
 .pick:active .pick-photo { transform: scale(0.98); }
 .pick[aria-pressed="true"] .pick-photo::after { content: ""; position: absolute; inset: 0; border: 3px solid var(--accent); border-radius: inherit; pointer-events: none; }
 .pick .nm { display: block; font-size: 0.9375rem; font-weight: 600; margin-top: var(--s2); line-height: 1.3; }
-.pick-default { display: block; margin-top: 2px; color: var(--muted); font-size: 0.75rem; line-height: 1.3; }
 .pick .pr { display: block; font-size: 0.875rem; font-weight: 700; color: var(--danger); }
 .pick-count { position: absolute; top: var(--s2); right: var(--s2); display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: var(--r-pill); background: var(--ink); color: var(--on-ink); font-size: 0.8125rem; font-weight: 700; box-shadow: var(--shadow-float); }
-.pick-variants { display: grid; gap: 6px; }
-.pick-variants button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--s2); align-items: center; min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: left; font-size: 0.75rem; }
-.pick-variants button[aria-pressed="true"] { border-color: var(--accent); background: var(--lav); box-shadow: inset 0 0 0 1px var(--accent); }
-.pick-variants button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.pick-variants button b { color: var(--danger); font-size: 0.75rem; white-space: nowrap; }
-.pick-variants button small { grid-column: 1 / -1; color: var(--muted); font-size: 0.6875rem; }
 .qty { display: inline-flex; align-items: center; border-radius: var(--r-pill); background: var(--sunken); }
 .qty button { width: 40px; height: 40px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; }
 .qty button:hover { background: var(--line); }
@@ -341,6 +337,11 @@ img { display: block; max-width: 100%; }
 .selline img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
 .selline .top { display: flex; justify-content: space-between; gap: var(--s2); }
 .selline .top > b { text-align: right; }
+.selline .top > div { min-width: 0; }
+.line-variants { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--s2); }
+.line-variants button { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); font-size: 0.8125rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; transition: background-color 150ms var(--ease), border-color 150ms var(--ease), transform 100ms var(--ease); }
+.line-variants button:active { transform: scale(0.97); }
+.line-variants button[aria-pressed="true"] { border-color: var(--lav); background: var(--lav); color: var(--lav-ink); font-weight: 700; }
 .line-variant { width: fit-content; margin-top: 4px; padding: 3px 9px; border-radius: var(--r-pill); background: var(--lav); color: var(--lav-ink); font-size: 0.75rem; font-weight: 700; }
 .selline .line-controls { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(124px, auto) minmax(0, 1fr); gap: var(--s3); align-items: end; }
 .selline .line-note { grid-column: 1 / -1; }
@@ -387,8 +388,8 @@ img { display: block; max-width: 100%; }
 .upl button { border: 1.5px dashed var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; font-size: 0.8125rem; }
 .autocode { display: flex; align-items: center; gap: var(--s2); padding: var(--s3) var(--s4); border-radius: 14px; background: var(--sky); color: var(--sky-ink); font-size: 0.875rem; }
 .variant-editor { display: grid; gap: var(--s3); padding: var(--s4); border: 1px solid var(--line); border-radius: 18px; background: var(--sunken); }
-.variant-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
-.variant-editor-head h2 { margin: 0 0 2px; font-size: 1rem; }
+.variant-editor-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.variant-editor-head h2 { margin: 0; font-size: 1rem; }
 .variant-list { display: grid; gap: var(--s3); }
 .variant-card { display: grid; gap: var(--s3); padding: var(--s4); border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 4px 16px oklch(0.4 0.04 285 / 0.06); }
 .variant-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }

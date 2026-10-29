@@ -649,13 +649,9 @@ function ProductSheet({
                 <p className="info-code">Mã mẫu {p.code}</p>
                 {p.variants.length ? (
                   <div className="variant-options" role="group" aria-label="Chọn biến thể">
-                    {p.variants.map((variant, index) => (
+                    {p.variants.map((variant) => (
                       <button key={variant.id} type="button" className="variant-option" aria-pressed={variant.id === selectedVariant?.id} onClick={() => onVariantChange(variant.id)}>
-                        <span>
-                          {variant.name}
-                          {index === 0 ? <small>Mặc định</small> : null}
-                        </span>
-                        <b>{money(variant.price)}</b>
+                        {variant.name}
                       </button>
                     ))}
                   </div>
