@@ -37,6 +37,22 @@ describe("creating and editing orders", () => {
     expect(o?.items[0]).toMatchObject({ nameSnapshot: "Bó hoa sáp đỏ", unitPriceSnapshot: 380000, note: "Bàn tiệc" });
   });
 
+  it("adds the extra amount to every unit and lets existing lines change it", async () => {
+    const { red } = await setup();
+    const { id } = await createOrder(orderInput([{ productId: red.id, qty: 2, extraPrice: 50000, extraNote: "Tăng size to" }]));
+    let o = (await getOrder(id))!;
+    expect(o).toMatchObject({ subtotal: 860000, total: 860000 });
+    expect(o.items[0]).toMatchObject({ unitPriceSnapshot: 380000, extraPrice: 50000, extraNote: "Tăng size to" });
+    await updateOrder(id, orderInput([{ id: o.items[0].id, productId: red.id, qty: 1, extraPrice: 20000, extraNote: "Thêm nơ" }]));
+    o = (await getOrder(id))!;
+    expect(o).toMatchObject({ subtotal: 400000, total: 400000 });
+    expect(o.items[0]).toMatchObject({ unitPriceSnapshot: 380000, extraPrice: 20000, extraNote: "Thêm nơ" });
+    await updateOrder(id, orderInput([{ id: o.items[0].id, productId: red.id, qty: 1, extraPrice: 0, extraNote: "bỏ" }]));
+    expect((await getOrder(id))!.items[0]).toMatchObject({ extraPrice: 0, extraNote: null });
+    expect((await getOrder(id))!.subtotal).toBe(380000);
+    await expect(createOrder(orderInput([{ productId: red.id, qty: 1, extraPrice: -1 }]))).rejects.toThrow(/cộng thêm/);
+  });
+
   it("requires a delivery date and rejects deposits above the total", async () => {
     const { red } = await setup();
     await expect(createOrder(orderInput([{ productId: red.id, qty: 1 }], { deliveryDate: "" }))).rejects.toThrow(/ngày giao/);

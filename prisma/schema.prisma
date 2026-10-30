@@ -259,6 +259,9 @@ model OrderItem {
   nameSnapshot        String  @map("name_snapshot")
   variantNameSnapshot String? @map("variant_name_snapshot")
   unitPriceSnapshot   Int     @map("unit_price_snapshot")
+  /// added to each unit on top of the price snapshot (e.g. a bigger size the customer asked for)
+  extraPrice          Int     @default(0) @map("extra_price")
+  extraNote           String? @map("extra_note")
   qty                 Int
   note                String?
   sortOrder           Int     @default(0) @map("sort_order")

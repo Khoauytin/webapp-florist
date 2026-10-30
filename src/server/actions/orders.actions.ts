@@ -41,6 +41,8 @@ const orderSchema = z.object({
         productId: z.string().uuid(),
         productVariantId: z.string().uuid().nullable().optional(),
         unitPrice: money.nullable().optional(),
+        extraPrice: money.optional(),
+        extraNote: optText(200),
         qty: z.number().int().min(1).max(10000),
         note: optText(300),
       }),

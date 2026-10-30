@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { PRICE_SORT_LABELS, sortByPrice, type PriceSort } from "@/lib/price-sort";
 
 export interface CatalogCategory {
   id: string;
@@ -117,9 +118,120 @@ function Contact({ shop, kind, label, main, onMissing }: ContactProps) {
   );
 }
 
+const SORT_OPTIONS: { value: PriceSort | ""; label: string }[] = [
+  { value: "", label: "Mặc định" },
+  { value: "asc", label: PRICE_SORT_LABELS.asc },
+  { value: "desc", label: PRICE_SORT_LABELS.desc },
+];
+
+/** Pill button with a rounded listbox, styled like the category tabs (a native select cannot be). */
+function SortMenu({ value, onChange }: { value: PriceSort | ""; onChange: (v: PriceSort | "") => void }) {
+  const [open, setOpen] = useState(false);
+  const [focus, setFocus] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const current = SORT_OPTIONS.find((o) => o.value === value) ?? SORT_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.focus();
+    const away = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    // Scrolling would carry the menu under the sticky category bar, so it closes instead.
+    const scrolled = () => setOpen(false);
+    document.addEventListener("pointerdown", away);
+    window.addEventListener("scroll", scrolled, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      window.removeEventListener("scroll", scrolled);
+    };
+  }, [open]);
+
+  const show = () => {
+    setFocus(Math.max(0, SORT_OPTIONS.indexOf(current)));
+    setOpen(true);
+  };
+  const close = () => {
+    setOpen(false);
+    btnRef.current?.focus();
+  };
+  const choose = (v: PriceSort | "") => {
+    onChange(v);
+    close();
+  };
+  const onListKey = (e: React.KeyboardEvent) => {
+    const last = SORT_OPTIONS.length - 1;
+    const keys: Record<string, () => void> = {
+      ArrowDown: () => setFocus((i) => (i === last ? 0 : i + 1)),
+      ArrowUp: () => setFocus((i) => (i === 0 ? last : i - 1)),
+      Home: () => setFocus(0),
+      End: () => setFocus(last),
+      Enter: () => choose(SORT_OPTIONS[focus].value),
+      " ": () => choose(SORT_OPTIONS[focus].value),
+      Escape: close,
+      Tab: () => setOpen(false),
+    };
+    if (!keys[e.key]) return;
+    if (e.key !== "Tab") e.preventDefault();
+    keys[e.key]();
+  };
+
+  return (
+    <div className="sort" ref={rootRef}>
+      <button
+        ref={btnRef}
+        className="sort-btn"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Sắp xếp: ${current.label}`}
+        data-active={value ? "" : undefined}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            show();
+          }
+        }}
+      >
+        <svg className="sort-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4m-3.5 3.5L17 4l3.5 3.5" />
+        </svg>
+        {value ? current.label : "Sắp xếp"}
+        <svg className="sort-caret" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open ? (
+        <ul ref={listRef} className="sort-menu" role="listbox" tabIndex={-1} aria-label="Sắp xếp mẫu" aria-activedescendant={`sort-opt-${focus}`} onKeyDown={onListKey}>
+          {SORT_OPTIONS.map((o, i) => (
+            <li
+              key={o.label}
+              id={`sort-opt-${i}`}
+              role="option"
+              aria-selected={o.value === value}
+              data-focus={i === focus ? "" : undefined}
+              onPointerEnter={() => setFocus(i)}
+              onClick={() => choose(o.value)}
+            >
+              {o.label}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export function CatalogApp({ categories, products, shop }: { categories: CatalogCategory[]; products: CatalogProduct[]; shop: ShopLinks }) {
   const [active, setActive] = useState("all");
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState<PriceSort | "">("");
   const [open, setOpen] = useState<CatalogProduct | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -135,7 +247,8 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
   };
 
   const term = q.trim().toLowerCase();
-  const list = products.filter((p) => (active === "all" || p.categoryId === active) && (!term || p.name.toLowerCase().includes(term) || p.code.toLowerCase().includes(term)));
+  const found = products.filter((p) => (active === "all" || p.categoryId === active) && (!term || p.name.toLowerCase().includes(term) || p.code.toLowerCase().includes(term)));
+  const list = sort ? sortByPrice(found, (p) => productPrice(p), sort) : found;
 
   // Each product has its own link (#bo-012): the phone's Back button closes the sheet.
   useEffect(() => {
@@ -397,11 +510,14 @@ export function CatalogApp({ categories, products, shop }: { categories: Catalog
         </div>
 
         <section className="catalog" id="catalog" role="tabpanel" aria-live="polite">
-          <p className="catalog-hint">
-            {list.length ? `${list.length} mẫu · Chạm vào mẫu để xem thêm ảnh` : term ? "Không tìm thấy mẫu phù hợp. Thử từ khác hoặc nhắn shop nhé." : "Dòng này chưa có mẫu. Bạn nhắn shop để xem các mẫu mới nhất nhé."}
-          </p>
-          {/* Keyed by category so switching tabs replays the staggered entrance. */}
-          <ul className="grid" key={active}>
+          <div className="catalog-bar">
+            <p className="catalog-hint">
+              {list.length ? `${list.length} mẫu · Chạm vào mẫu để xem thêm ảnh` : term ? "Không tìm thấy mẫu phù hợp. Thử từ khác hoặc nhắn shop nhé." : "Dòng này chưa có mẫu. Bạn nhắn shop để xem các mẫu mới nhất nhé."}
+            </p>
+            <SortMenu value={sort} onChange={setSort} />
+          </div>
+          {/* Keyed by category and order so switching either replays the staggered entrance. */}
+          <ul className="grid" key={`${active}-${sort}`}>
             {list.map((p, i) => (
               <li key={p.code} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
                 <button

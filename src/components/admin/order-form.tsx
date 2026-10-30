@@ -47,6 +47,8 @@ export function OrderForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
+  /** lines whose "Cộng thêm tiền" box is open while the amount is still empty */
+  const [extraOpen, setExtraOpen] = useState<Set<string>>(new Set());
   const seq = useRef(0);
   const lookupSeq = useRef(0);
   const set = <K extends keyof OrderFormValues>(k: K, val: OrderFormValues[K]) => setV((s) => ({ ...s, [k]: val }));
@@ -74,7 +76,7 @@ export function OrderForm({
     };
   }, [categoryId, initialProducts, q]);
 
-  const subtotal = v.lines.reduce((s, l) => s + (l.price ?? 0) * l.qty, 0);
+  const subtotal = v.lines.reduce((s, l) => s + ((l.price ?? 0) + l.extraPrice) * l.qty, 0);
   const total = Math.max(0, subtotal - v.discount) + v.shippingFee;
   const owed = Math.max(0, total - v.deposit);
   const shown = q || categoryId ? results : initialProducts;
@@ -97,7 +99,7 @@ export function OrderForm({
   };
   const add = (p: PickProduct, variant = p.variants[0] ?? null) => {
     setV((s) => {
-      const existing = s.lines.find((l) => l.productId === p.id && l.productVariantId === (variant?.id ?? null) && !l.id);
+      const existing = s.lines.find((l) => l.productId === p.id && l.productVariantId === (variant?.id ?? null) && !l.id && !l.extraPrice);
       if (existing) return { ...s, lines: s.lines.map((l) => (l === existing ? { ...l, qty: Math.min(10000, l.qty + 1) } : l)) };
       const line: FormLine = {
         key: newKey(),
@@ -110,6 +112,8 @@ export function OrderForm({
         price: variant?.price ?? p.price,
         isPriceEditable: !variant && p.price === null,
         imageUrl: p.imageUrl,
+        extraPrice: 0,
+        extraNote: "",
         qty: 1,
         note: "",
       };
@@ -125,9 +129,9 @@ export function OrderForm({
     setV((s) => {
       const line = s.lines.find((l) => l.key === key);
       if (!line || line.productVariantId === variant.id) return s;
-      const twin = s.lines.find((l) => l !== line && !l.id && l.productId === line.productId && l.productVariantId === variant.id);
+      const twin = s.lines.find((l) => l !== line && !l.id && l.productId === line.productId && l.productVariantId === variant.id && l.extraPrice === line.extraPrice);
       if (twin) {
-        const lines = s.lines.filter((l) => l !== line).map((l) => (l === twin ? { ...l, qty: Math.min(10000, l.qty + line.qty), note: l.note || line.note } : l));
+        const lines = s.lines.filter((l) => l !== line).map((l) => (l === twin ? { ...l, qty: Math.min(10000, l.qty + line.qty), note: l.note || line.note, extraNote: l.extraNote || line.extraNote } : l));
         return { ...s, lines };
       }
       return { ...s, lines: s.lines.map((l) => (l === line ? { ...l, productVariantId: variant.id, variantName: variant.name, price: variant.price } : l)) };
@@ -144,6 +148,21 @@ export function OrderForm({
     }
   };
   const removeLine = (key: string) => setV((s) => ({ ...s, lines: s.lines.filter((l) => l.key !== key) }));
+  const toggleExtra = (key: string, open: boolean) =>
+    setExtraOpen((keys) => {
+      const next = new Set(keys);
+      if (open) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  const openExtra = (key: string) => {
+    toggleExtra(key, true);
+    requestAnimationFrame(() => document.getElementById(`le-${key}`)?.focus());
+  };
+  const clearExtra = (key: string) => {
+    updateLine(key, { extraPrice: 0, extraNote: "" });
+    toggleExtra(key, false);
+  };
 
   const submit = () => {
     const missingPrice = v.lines.find((line) => line.price === null);
@@ -181,6 +200,8 @@ export function OrderForm({
           productId: l.productId,
           productVariantId: l.productVariantId,
           unitPrice: l.isPriceEditable ? l.price : undefined,
+          extraPrice: l.extraPrice,
+          extraNote: l.extraPrice ? l.extraNote : undefined,
           qty: l.qty,
           note: l.note || undefined,
         })),
@@ -331,7 +352,7 @@ export function OrderForm({
                         {l.code} · {l.id ? "Giá lúc đặt" : l.isPriceEditable ? "Giá báo khách" : "Giá catalog"}
                       </div>
                     </div>
-                    <b>{l.price === null ? "Chưa nhập giá" : formatMoney(l.price * l.qty)}</b>
+                    <b>{l.price === null ? "Chưa nhập giá" : formatMoney((l.price + l.extraPrice) * l.qty)}</b>
                   </div>
                   {canPickVariant(l) ? (
                     <div className="line-variants" role="group" aria-label={`Chọn biến thể ${l.name}`}>
@@ -369,6 +390,29 @@ export function OrderForm({
                       )}
                     </div>
                   </div>
+                  {l.extraPrice || extraOpen.has(l.key) ? (
+                    <div className="line-extra-box" role="group" aria-labelledby={`lx-${l.key}`}>
+                      <span className="line-extra-title" id={`lx-${l.key}`}>
+                        Cộng thêm tiền
+                      </span>
+                      <div className="field">
+                        <label htmlFor={`le-${l.key}`}>Số tiền / sp</label>
+                        <MoneyInput id={`le-${l.key}`} value={l.extraPrice || null} onChange={(extraPrice) => updateLine(l.key, { extraPrice: extraPrice ?? 0 })} placeholder="Ví dụ: 50.000" />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`lr-${l.key}`}>Lý do</label>
+                        <input className="input" id={`lr-${l.key}`} placeholder="Ví dụ: tăng size to" value={l.extraNote} onChange={(e) => updateLine(l.key, { extraNote: e.target.value })} maxLength={200} />
+                      </div>
+                      <button className="line-extra-clear" type="button" aria-label="Bỏ tiền cộng thêm" onClick={() => clearExtra(l.key)}>
+                        <Icon name="x" className="icon-sm" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="line-extra-add" type="button" onClick={() => openExtra(l.key)}>
+                      <Icon name="plus" className="icon-sm" />
+                      Cộng thêm tiền
+                    </button>
+                  )}
                   <div className="field line-note">
                     <label htmlFor={`ln-${l.key}`}>Ghi chú cho mẫu</label>
                     <input className="input" id={`ln-${l.key}`} placeholder="Ví dụ: tông hồng, nơ trắng" value={l.note} onChange={(e) => updateLine(l.key, { note: e.target.value })} maxLength={300} />

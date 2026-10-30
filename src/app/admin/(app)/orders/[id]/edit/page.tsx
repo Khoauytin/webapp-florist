@@ -48,6 +48,8 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
       price: i.unitPriceSnapshot,
       isPriceEditable: false,
       imageUrl: i.product.images[0]?.url ?? null,
+      extraPrice: i.extraPrice,
+      extraNote: i.extraNote ?? "",
       qty: i.qty,
       note: i.note ?? "",
     })),

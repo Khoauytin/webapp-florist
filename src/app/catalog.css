@@ -202,6 +202,27 @@
     font-size: .875rem;
     color: var(--ink-soft);
   }
+  .catalog-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+  .catalog-bar .catalog-hint { flex: 1 1 auto; min-width: 0; margin: 0; }
+  .sort { position: relative; flex: none; }
+  .sort-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 16px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font: inherit; font-size: .95rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color .18s, border-color .18s, transform .12s; }
+  .sort-btn:hover { border-color: var(--sky); }
+  .sort-btn:active { transform: scale(.97); }
+  .sort-btn:focus-visible { outline: none; border-color: var(--sky-deep); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sky) 35%, transparent); }
+  .sort-btn[data-active] { border-color: var(--sky); background: var(--sky-pale); }
+  .sort-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .sort-icon { color: var(--ink-soft); }
+  .sort-caret { color: var(--ink-soft); transition: transform .2s; }
+  .sort-btn[aria-expanded="true"] .sort-caret { transform: rotate(180deg); }
+  .sort-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 200px; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--line); border-radius: 20px; background: #fff; box-shadow: 0 12px 32px rgba(22, 51, 91, .16); transform-origin: top right; animation: sort-in .16s cubic-bezier(.22, 1, .36, 1); }
+  .sort-menu:focus { outline: none; }
+  .sort-menu li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0 12px 0 14px; border-radius: 999px; color: var(--ink); font-size: .95rem; font-weight: 600; cursor: pointer; }
+  .sort-menu li[data-focus] { background: var(--sky-pale); }
+  .sort-menu li[aria-selected="true"] { color: var(--sky-deep); }
+  .sort-menu li svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; visibility: hidden; }
+  .sort-menu li[aria-selected="true"] svg { visibility: visible; }
+  @keyframes sort-in { from { opacity: 0; transform: translateY(-4px) scale(.96); } }
+  @media (prefers-reduced-motion: reduce) { .sort-menu { animation: none; } .sort-caret { transition: none; } }
   .grid {
     list-style: none;
     margin: 0;

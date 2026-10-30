@@ -133,11 +133,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <div className="nm">{i.nameSnapshot}</div>
                 {i.variantNameSnapshot ? <div className="line-variant">{i.variantNameSnapshot}</div> : null}
                 <div className="meta">
-                  {i.productCodeSnapshot} · {formatMoney(i.unitPriceSnapshot)} × {i.qty}
+                  {i.productCodeSnapshot} · {formatMoney(i.unitPriceSnapshot)}
+                  {i.extraPrice ? ` + ${formatMoney(i.extraPrice)}` : ""} × {i.qty}
                 </div>
+                {i.extraPrice ? <div className="line-extra">+ {i.extraNote || "Cộng thêm"}</div> : null}
                 {i.note ? <div className="note">{i.note}</div> : null}
               </div>
-              <b>{formatMoney(i.unitPriceSnapshot * i.qty)}</b>
+              <b>{formatMoney((i.unitPriceSnapshot + i.extraPrice) * i.qty)}</b>
             </div>
           ))}
         </div>
@@ -147,7 +149,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <section className="section">
           <div className="card pad">
             <h2 style={{ marginBottom: 12 }}>Ghi chú</h2>
-            <dl className="kv">
+            <dl className="kv notes">
               {o.cardMessage ? (
                 <>
                   <dt>Lời chúc</dt>

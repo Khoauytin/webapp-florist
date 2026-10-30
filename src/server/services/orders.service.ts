@@ -18,6 +18,9 @@ export interface OrderItemInput {
   productVariantId?: string | null;
   /** quoted price for a new catalog item that has no listed price */
   unitPrice?: number | null;
+  /** added to each unit on top of the line price, with its reason */
+  extraPrice?: number;
+  extraNote?: string;
   qty: number;
   note?: string;
 }
@@ -116,6 +119,12 @@ async function resolveCustomer(tx: Tx, input: OrderInput) {
   return tx.customer.findUniqueOrThrow({ where: { phone } });
 }
 
+/** "Cộng thêm tiền": the reason is kept only while there is an amount. */
+function extra(item: OrderItemInput) {
+  const extraPrice = item.extraPrice ?? 0;
+  return { extraPrice, extraNote: extraPrice ? blank(item.extraNote) : null };
+}
+
 /** Snapshots for new lines. Hidden and unpriced products can be ordered; archived ones cannot. */
 async function snapshotNewLines(tx: Tx, items: OrderItemInput[]) {
   const products = await tx.product.findMany({
@@ -139,6 +148,7 @@ async function snapshotNewLines(tx: Tx, items: OrderItemInput[]) {
       nameSnapshot: p.name,
       variantNameSnapshot: variant?.name ?? null,
       unitPriceSnapshot: unitPrice,
+      ...extra(item),
       qty: item.qty,
       note: blank(item.note),
     };
@@ -153,6 +163,9 @@ function checkItems(items: OrderItemInput[]) {
     if (i.unitPrice !== undefined && i.unitPrice !== null && (!Number.isInteger(i.unitPrice) || i.unitPrice < 0 || i.unitPrice > 2_000_000_000)) {
       throw new AppError("Đơn giá không hợp lệ.", { items: "Đơn giá không hợp lệ" });
     }
+    if (i.extraPrice !== undefined && (!Number.isInteger(i.extraPrice) || i.extraPrice < 0 || i.extraPrice > 2_000_000_000)) {
+      throw new AppError("Tiền cộng thêm không hợp lệ.", { items: "Tiền cộng thêm không hợp lệ" });
+    }
   }
 }
 
@@ -163,7 +176,7 @@ export async function createOrder(input: OrderInput): Promise<{ id: string; code
   return prisma.$transaction(async (tx) => {
     const customer = await resolveCustomer(tx, input);
     const lines = await snapshotNewLines(tx, input.items);
-    const m = money(lines.map((l) => ({ unitPrice: l.unitPriceSnapshot, qty: l.qty })), input);
+    const m = money(lines.map((l) => ({ unitPrice: l.unitPriceSnapshot + l.extraPrice, qty: l.qty })), input);
     const code = await nextOrderCode(tx);
     const order = await tx.order.create({
       data: {
@@ -182,7 +195,7 @@ export async function createOrder(input: OrderInput): Promise<{ id: string; code
 
 /**
  * Edit everything except a cancelled order (restore it first). Existing lines keep their name and
- * price snapshot; only quantity and note change. New lines are priced today; removed lines go.
+ * price snapshot; only quantity, note and the added amount change. New lines are priced today; removed lines go.
  */
 export async function updateOrder(orderId: string, input: OrderInput) {
   checkItems(input.items);
@@ -197,10 +210,10 @@ export async function updateOrder(orderId: string, input: OrderInput) {
     const freshLines = await snapshotNewLines(tx, fresh);
     const lines = input.items.map((item, index) => {
       const old = item.id ? existing.get(item.id) : undefined;
-      if (old) return { kind: "keep" as const, id: old.id, unitPrice: old.unitPriceSnapshot, data: { qty: item.qty, note: blank(item.note), sortOrder: index } };
+      if (old) return { kind: "keep" as const, id: old.id, unitPrice: old.unitPriceSnapshot, data: { qty: item.qty, note: blank(item.note), ...extra(item), sortOrder: index } };
       return { kind: "new" as const, data: { ...freshLines[fresh.indexOf(item)], sortOrder: index } };
     });
-    const m = money(lines.map((l) => (l.kind === "keep" ? { unitPrice: l.unitPrice, qty: l.data.qty } : { unitPrice: l.data.unitPriceSnapshot, qty: l.data.qty })), input);
+    const m = money(lines.map((l) => (l.kind === "keep" ? { unitPrice: l.unitPrice + l.data.extraPrice, qty: l.data.qty } : { unitPrice: l.data.unitPriceSnapshot + l.data.extraPrice, qty: l.data.qty })), input);
     const keep = lines.flatMap((l) => (l.kind === "keep" ? [l.id] : []));
     await tx.orderItem.deleteMany({ where: { orderId, id: { notIn: keep } } });
     for (const l of lines) if (l.kind === "keep") await tx.orderItem.update({ where: { id: l.id }, data: l.data });
@@ -414,15 +427,15 @@ interface TopSellingProductRow {
 export async function topSellingProducts(rankBy: ProductRanking = "quantity") {
   const orderBy =
     rankBy === "revenue"
-      ? Prisma.sql`SUM(oi.qty::bigint * oi.unit_price_snapshot::bigint) DESC, SUM(oi.qty)::bigint DESC`
-      : Prisma.sql`SUM(oi.qty)::bigint DESC, SUM(oi.qty::bigint * oi.unit_price_snapshot::bigint) DESC`;
+      ? Prisma.sql`SUM(oi.qty::bigint * (oi.unit_price_snapshot::bigint + oi.extra_price::bigint)) DESC, SUM(oi.qty)::bigint DESC`
+      : Prisma.sql`SUM(oi.qty)::bigint DESC, SUM(oi.qty::bigint * (oi.unit_price_snapshot::bigint + oi.extra_price::bigint)) DESC`;
   const rows = await prisma.$queryRaw<TopSellingProductRow[]>`
     SELECT
       p.id AS "productId",
       p.code,
       p.name,
       SUM(oi.qty)::bigint AS quantity,
-      SUM(oi.qty::bigint * oi.unit_price_snapshot::bigint)::bigint AS revenue
+      SUM(oi.qty::bigint * (oi.unit_price_snapshot::bigint + oi.extra_price::bigint))::bigint AS revenue
     FROM order_items oi
     INNER JOIN orders o ON o.id = oi.order_id
     INNER JOIN products p ON p.id = oi.product_id

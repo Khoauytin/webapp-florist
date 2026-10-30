@@ -30,6 +30,9 @@ export interface FormLine {
   /** Only catalog items without a listed price need a quote entered on this new line. */
   isPriceEditable: boolean;
   imageUrl: string | null;
+  /** "Cộng thêm tiền": added to each unit, works on existing lines too */
+  extraPrice: number;
+  extraNote: string;
   qty: number;
   note: string;
 }
